@@ -1,6 +1,6 @@
 /**
  * ====================================================================
- * WARGAKOE - BACKEND LOGIC & CRUD OPERATIONS (REVISED)
+ * WARGAKOE - BACKEND LOGIC & CRUD OPERATIONS
  * By Zettbos System (ZettBOT 3.1)
  * ====================================================================
  */
@@ -68,21 +68,17 @@ function loginUser(noHp, password) {
     var headers = data[0];
     var hpIdx = headers.indexOf('No_HP');
     var passIdx = headers.indexOf('Password');
-    var kkIdx = headers.indexOf('No_KK');
-    var namaIdx = headers.indexOf('Nama');
-    var roleIdx = headers.indexOf('Role');
-    var statusUserIdx = headers.indexOf('Status_User');
 
     for (var i = 1; i < data.length; i++) {
       var row = data[i];
       if (row[hpIdx] === noHp.trim() && row[passIdx] === password.trim()) {
         var userObj = {
-          noKk: row[kkIdx],
+          noKk: row[headers.indexOf('No_KK')],
           noKtp: row[headers.indexOf('No_KTP')],
-          nama: row[namaIdx],
+          nama: row[headers.indexOf('Nama')],
           noHp: row[hpIdx],
-          role: row[roleIdx],
-          statusUser: row[statusUserIdx],
+          role: row[headers.indexOf('Role')],
+          statusUser: row[headers.indexOf('Status_User')],
           tanggalLahir: row[headers.indexOf('Tanggal_Lahir')],
           umur: row[headers.indexOf('Umur')],
           alamat: row[headers.indexOf('Alamat')],
@@ -177,8 +173,8 @@ function getDashboardSummary(userRole, userNoKk) {
       lansia: 0,
       totalWarga: totalWarga,
       totalKk: totalKk,
-      kasRtBulanIni: 0,        // Iuran RT
-      kasKematianBulanIni: 0,  // Iuran Duka
+      kasRtBulanIni: 0,
+      kasKematianBulanIni: 0,
       iuranSampahBulanIni: 0,
       iuranSosialBulanIni: 0,
       iuranLainBulanIni: 0,
@@ -271,6 +267,62 @@ function getDashboardSummary(userRole, userNoKk) {
     return { success: true, data: stats };
   } catch (error) {
     return { success: false, message: 'Gagal memuat statistik: ' + error.toString() };
+  }
+}
+
+function getKasRtDetails(bulanTahun) {
+  try {
+    var sheet = getSheet_('KAS_RT');
+    var rawData = sheet.getDataRange().getDisplayValues();
+    if (rawData.length <= 1) {
+      return { success: true, data: [], totalPemasukan: 0, totalPengeluaran: 0, sisaSaldo: 0 };
+    }
+
+    var headers = rawData[0];
+    var idIdx = headers.indexOf('ID_Kas');
+    var tglIdx = headers.indexOf('Tanggal');
+    var jenisIdx = headers.indexOf('Jenis_Kas');
+    var katIdx = headers.indexOf('Kategori');
+    var ketIdx = headers.indexOf('Keterangan');
+    var nomIdx = headers.indexOf('Nominal');
+    var bulanIdx = headers.indexOf('Bulan_Tahun');
+
+    var list = [];
+    var totalPemasukan = 0;
+    var totalPengeluaran = 0;
+
+    for (var i = 1; i < rawData.length; i++) {
+      var row = rawData[i];
+      var rowBulan = row[bulanIdx];
+      var jenis = row[jenisIdx];
+      var nominal = parseFloat(row[nomIdx]) || 0;
+
+      if (!bulanTahun || bulanTahun === 'SEMUA' || rowBulan === bulanTahun) {
+        if (jenis === 'Pemasukan') totalPemasukan += nominal;
+        else if (jenis === 'Pengeluaran') totalPengeluaran += nominal;
+
+        list.push({
+          idKas: row[idIdx],
+          tanggal: row[tglIdx],
+          jenisKas: jenis,
+          kategori: row[katIdx],
+          keterangan: row[ketIdx],
+          nominal: nominal,
+          bulanTahun: rowBulan
+        });
+      }
+    }
+
+    var sisaSaldo = totalPemasukan - totalPengeluaran;
+    return {
+      success: true,
+      data: list.reverse(),
+      totalPemasukan: totalPemasukan,
+      totalPengeluaran: totalPengeluaran,
+      sisaSaldo: sisaSaldo
+    };
+  } catch (error) {
+    return { success: false, message: 'Gagal memuat detail Kas RT: ' + error.toString() };
   }
 }
 
