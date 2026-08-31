@@ -1,0 +1,119 @@
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          brand: {
+            indigo: '#221d52',
+            dark: '#18143d',
+            amber: '#f7941d',
+            pink: '#e85675',
+            cyan: '#67d4e4',
+            lavender: '#e0e2f8',
+            bg: '#f4f6fa',
+            neon: '#00ffaa'
+          }
+        },
+        fontFamily: {
+          sans: ['"Plus Jakarta Sans"', 'sans-serif']
+        }
+      }
+    }
+  }
+</script>
+
+<style>
+  body {
+    background-color: #f4f6fa;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    color: #1e293b;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #f1f5f9;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+
+  /* Smooth Transitions */
+  .transition-all-300 {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Active Sidebar Notch Curve effect */
+  .nav-item-active {
+    background-color: #f4f6fa;
+    color: #221d52 !important;
+    font-weight: 700;
+    border-top-left-radius: 1.5rem;
+    border-bottom-left-radius: 1.5rem;
+    position: relative;
+  }
+  .nav-item-active::before {
+    content: '';
+    position: absolute;
+    top: -20px;
+    right: 0;
+    width: 20px;
+    height: 20px;
+    background-color: transparent;
+    border-bottom-right-radius: 20px;
+    box-shadow: 8px 8px 0 0 #f4f6fa;
+    pointer-events: none;
+  }
+  .nav-item-active::after {
+    content: '';
+    position: absolute;
+    bottom: -20px;
+    right: 0;
+    width: 20px;
+    height: 20px;
+    background-color: transparent;
+    border-top-right-radius: 20px;
+    box-shadow: 8px -8px 0 0 #f4f6fa;
+    pointer-events: none;
+  }
+
+  /* Input Pill Rounded styling */
+  .input-pill {
+    border-radius: 9999px;
+    padding: 0.75rem 1.25rem;
+    border: 1.5px solid #e2e8f0;
+    background-color: #ffffff;
+    outline: none;
+    transition: all 0.2s ease;
+  }
+  .input-pill:focus {
+    border-color: #f7941d;
+    box-shadow: 0 0 0 4px rgba(247, 148, 29, 0.15);
+  }
+
+  /* Dashboard Card Styling */
+  .dashboard-card {
+    background: #ffffff;
+    border-radius: 1.25rem;
+    box-shadow: 0 10px 25px -5px rgba(34, 29, 82, 0.05), 0 8px 10px -6px rgba(34, 29, 82, 0.03);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+  }
+  
+  /* Splash Screen Blob */
+  .blob-shape {
+    border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%;
+    animation: morph 6s ease-in-out infinite;
+  }
+  @keyframes morph {
+    0%, 100% { border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%; }
+    50% { border-radius: 70% 30% 46% 54% / 30% 65% 35% 70%; }
+  }
+</style>
