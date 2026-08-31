@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Wargakoe - Sistem Pengelolaan Warga & Iuran RT</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <?!= include('css'); ?>
+</head>
+<body class="antialiased min-h-screen relative overflow-x-hidden selection:bg-brand-pink selection:text-white">
+
+  <!-- 1. SPLASH SCREEN -->
+  <div id="splashScreen" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-brand-indigo text-white transition-opacity duration-500">
+    <div class="relative flex items-center justify-center">
+      <div class="w-28 h-28 bg-gradient-to-tr from-brand-amber via-brand-pink to-brand-cyan blob-shape opacity-80 blur-md absolute"></div>
+      <div class="w-24 h-24 bg-brand-dark rounded-3xl border border-white/20 flex items-center justify-center shadow-2xl relative z-10 transform scale-100 hover:scale-105 transition-transform">
+        <i class="fa-solid fa-people-roof text-4xl text-brand-neon"></i>
+      </div>
+    </div>
+    <div class="mt-6 text-center">
+      <h1 class="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-brand-amber via-white to-brand-cyan">
+        Wargakoe
+      </h1>
+      <p class="text-xs uppercase tracking-widest text-slate-300 mt-1 font-medium">Sistem Warga & Iuran RT Cerdas</p>
+    </div>
+    <div class="mt-8 flex items-center gap-2">
+      <div class="w-2.5 h-2.5 rounded-full bg-brand-amber animate-bounce" style="animation-delay: 0.1s;"></div>
+      <div class="w-2.5 h-2.5 rounded-full bg-brand-pink animate-bounce" style="animation-delay: 0.2s;"></div>
+      <div class="w-2.5 h-2.5 rounded-full bg-brand-cyan animate-bounce" style="animation-delay: 0.3s;"></div>
+    </div>
+  </div>
+
+  <!-- 2. AUTHENTICATION SECTION -->
+  <div id="authContainer" class="hidden min-h-screen flex items-center justify-center p-4 sm:p-6 bg-brand-bg">
+    <div class="w-full max-w-md">
+      
+      <div class="text-center mb-6">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-brand-indigo text-brand-neon shadow-lg mb-3">
+          <i class="fa-solid fa-people-roof text-2xl"></i>
+        </div>
+        <h2 class="text-2xl font-bold text-brand-indigo">Wargakoe Portal</h2>
+        <p class="text-sm text-slate-500">Kelola data keluarga &amp; pembayaran iuran RT</p>
+      </div>
+
+      <!-- FORM LOGIN -->
+      <div id="loginCard" class="dashboard-card p-6 sm:p-8">
+        <div class="flex items-center justify-between pb-4 mb-5 border-b border-slate-100">
+          <h3 class="text-lg font-bold text-slate-800">Masuk Akun</h3>
+          <span class="text-xs px-2.5 py-1 bg-brand-lavender text-brand-indigo font-semibold rounded-full">RT 05 / RW 02</span>
+        </div>
+
+        <form id="loginForm" onsubmit="event.preventDefault(); handleLogin();" class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Nomor Handphone</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400">
+                <i class="fa-solid fa-phone"></i>
+              </span>
+              <input type="tel" id="loginNoHp" required placeholder="081234567890" class="input-pill w-full pl-11 text-sm">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Password</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400">
+                <i class="fa-solid fa-lock"></i>
+              </span>
+              <input type="password" id="loginPassword" required placeholder="••••••••" class="input-pill w-full pl-11 text-sm">
+            </div>
+          </div>
+
+          <button type="submit" id="btnLogin" class="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-brand-pink to-brand-amber text-white font-bold text-sm shadow-lg shadow-brand-pink/30 hover:opacity-95 active:scale-98 transition-all-300 flex items-center justify-center gap-2">
+            <span>Masuk Sekarang</span>
+            <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </form>
+
+        <div class="mt-6 text-center pt-4 border-t border-slate-100">
+          <p class="text-xs text-slate-500">
+            Belum terdaftar sebagai warga?
+            <button type="button" onclick="showAuthCard('register')" class="text-brand-pink font-bold hover:underline ml-1">
+              Daftar Baru
+            </button>
+          </p>
+        </div>
+      </div>
+
+      <!-- FORM REGISTER -->
+      <div id="registerCard" class="hidden dashboard-card p-6 sm:p-8">
+        <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+          <div>
+            <h3 class="text-lg font-bold text-slate-800">Registrasi Warga</h3>
+            <p class="text-xs text-slate-500">Lengkapi data KK &amp; KTP Anda</p>
+          </div>
+          <button type="button" onclick="showAuthCard('login')" class="text-xs text-slate-400 hover:text-brand-pink">
+            <i class="fa-solid fa-arrow-left mr-1"></i> Login
+          </button>
+        </div>
+
+        <form id="registerForm" onsubmit="event.preventDefault(); handleRegister();" class="space-y-3.5 text-xs max-h-[70vh] overflow-y-auto pr-1">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Status Pendaftaran</label>
+            <div class="grid grid-cols-2 gap-2">
+              <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 cursor-pointer hover:border-brand-amber transition">
+                <input type="radio" name="regStatusUser" value="Warga" checked onchange="toggleRoleSelect(this.value)" class="text-brand-pink">
+                <span class="font-medium text-slate-700">Warga RT</span>
+              </label>
+              <label class="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 cursor-pointer hover:border-brand-amber transition">
+                <input type="radio" name="regStatusUser" value="Pengurus RT" onchange="toggleRoleSelect(this.value)" class="text-brand-pink">
+                <span class="font-medium text-slate-700">Pengurus RT</span>
+              </label>
+            </div>
+          </div>
+
+          <div id="rolePengurusContainer" class="hidden">
+            <label class="block font-semibold text-slate-700 mb-1">Jabatan Pengurus</label>
+            <select id="regRole" class="input-pill w-full text-xs">
+              <option value="Ketua RT">Ketua RT</option>
+              <option value="Wakil RT">Wakil RT</option>
+              <option value="Bendahara">Bendahara</option>
+              <option value="Sekretaris">Sekretaris</option>
+              <option value="Petugas Sampah">Petugas Sampah</option>
+              <option value="Petugas Dawis">Petugas Dawis</option>
+              <option value="Super Admin">Super Admin</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Nama Lengkap (Kepala Keluarga)</label>
+            <input type="text" id="regNama" required placeholder="Contoh: Budi Santoso" class="input-pill w-full">
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Nomor Kartu Keluarga (KK)</label>
+              <input type="number" id="regNoKk" required placeholder="16 digit KK" class="input-pill w-full">
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Nomor KTP (NIK)</label>
+              <input type="number" id="regNoKtp" required placeholder="16 digit NIK" class="input-pill w-full">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Tanggal Lahir</label>
+              <input type="date" id="regTglLahir" required onchange="calculateAgeRealtime(this.value, 'regUmurDisplay', 'regUmurVal')" class="input-pill w-full">
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Umur (Otomatis)</label>
+              <input type="text" id="regUmurDisplay" readonly placeholder="0 Tahun" class="input-pill w-full bg-slate-100 font-bold text-brand-indigo">
+              <input type="hidden" id="regUmurVal" value="0">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Jenis Kelamin</label>
+              <select id="regJenisKelamin" class="input-pill w-full">
+                <option value="Laki-laki">Laki-laki</option>
+                <option value="Perempuan">Perempuan</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Status Keluarga</label>
+              <select id="regStatusKeluarga" class="input-pill w-full">
+                <option value="Suami">Suami</option>
+                <option value="Istri">Istri</option>
+                <option value="Ayah">Ayah</option>
+                <option value="Ibu">Ibu</option>
+                <option value="Anak">Anak</option>
+                <option value="Saudara">Saudara</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Status Rumah</label>
+              <select id="regStatusRumah" class="input-pill w-full">
+                <option value="Pribadi">Pribadi</option>
+                <option value="Kontrak">Kontrak</option>
+                <option value="Kos">Kos</option>
+                <option value="Rumah Orang Tua">Rumah Orang Tua</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Pendidikan Terakhir</label>
+              <select id="regPendidikan" class="input-pill w-full">
+                <option value="SD">SD</option>
+                <option value="SMP">SMP</option>
+                <option value="SMA">SMA / SMK</option>
+                <option value="Diploma">Diploma (D3)</option>
+                <option value="Sarjana">Sarjana (S1/S2/S3)</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Pekerjaan</label>
+            <select id="regPekerjaan" class="input-pill w-full">
+              <option value="Pegawai Swasta">Pegawai Swasta</option>
+              <option value="Pegawai Negeri">Pegawai Negeri (PNS/TNI/Polri)</option>
+              <option value="Wiraswasta">Wiraswasta / Pedagang</option>
+              <option value="Ibu Rumah Tangga">Ibu Rumah Tangga</option>
+              <option value="Ojol / Driver">Ojol / Driver Transportasi</option>
+              <option value="Buruh Harian">Buruh Harian</option>
+              <option value="Lainnya">Lainnya</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Alamat Lengkap (No Rumah/Blok)</label>
+            <input type="text" id="regAlamat" required placeholder="Jl. Mawar No. 05 RT 05/RW 02" class="input-pill w-full">
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">No. Handphone (Login)</label>
+              <input type="tel" id="regNoHp" required placeholder="081234567890" class="input-pill w-full">
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Password</label>
+              <input type="password" id="regPassword" required placeholder="••••••••" class="input-pill w-full">
+            </div>
+          </div>
+
+          <div class="pt-2">
+            <button type="submit" id="btnRegister" class="w-full py-3 px-6 rounded-full bg-gradient-to-r from-brand-amber to-brand-pink text-white font-bold text-xs shadow-md hover:opacity-95 transition-all-300">
+              Daftarkan Data Warga
+            </button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 3. MAIN APP DASHBOARD -->
+  <div id="mainDashboard" class="hidden min-h-screen flex flex-col md:flex-row bg-brand-bg">
+    
+    <!-- DESKTOP SIDEBAR -->
+    <aside class="hidden md:flex flex-col w-64 bg-brand-indigo text-white p-5 justify-between select-none shadow-2xl relative z-20">
+      <div>
+        <div class="flex items-center gap-3 px-2 py-4 mb-6 border-b border-white/10">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-amber to-brand-pink flex items-center justify-center text-white shadow-md">
+            <i class="fa-solid fa-people-roof text-lg"></i>
+          </div>
+          <div>
+            <h2 class="font-extrabold text-base tracking-tight text-white leading-tight">Wargakoe</h2>
+            <span class="text-[10px] text-brand-neon font-semibold uppercase tracking-wider">RT 05 / RW 02</span>
+          </div>
+        </div>
+
+        <nav class="space-y-2">
+          <button onclick="switchTab('dashboard')" id="sideNav-dashboard" class="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all-300 nav-item-active">
+            <i class="fa-solid fa-chart-pie w-4 text-center"></i>
+            <span>Dashboard</span>
+          </button>
+
+          <button onclick="switchTab('warga')" id="sideNav-warga" class="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all-300">
+            <i class="fa-solid fa-address-book w-4 text-center"></i>
+            <span>Data Warga</span>
+          </button>
+
+          <button onclick="switchTab('iuran')" id="sideNav-iuran" class="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all-300">
+            <i class="fa-solid fa-money-bill-wave w-4 text-center"></i>
+            <span>Iuran &amp; Kas RT</span>
+          </button>
+
+          <button onclick="switchTab('keluarga')" id="sideNav-keluarga" class="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all-300">
+            <i class="fa-solid fa-house-user w-4 text-center"></i>
+            <span>Keluarga Saya</span>
+          </button>
+
+          <button onclick="switchTab('mading')" id="sideNav-mading" class="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all-300">
+            <i class="fa-solid fa-bullhorn w-4 text-center"></i>
+            <span>Informasi Mading</span>
+          </button>
+        </nav>
+      </div>
+
+      <div class="pt-4 border-t border-white/10">
+        <div class="flex items-center gap-3 p-2 bg-brand-dark/60 rounded-2xl border border-white/10 mb-3">
+          <div class="w-9 h-9 rounded-xl bg-brand-lavender text-brand-indigo font-bold flex items-center justify-center text-sm shadow-sm" id="userAvatarDesktop">
+            U
+          </div>
+          <div class="overflow-hidden">
+            <p class="text-xs font-bold text-white truncate" id="userNameDesktop">Nama User</p>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-brand-pink/30 text-brand-pink font-semibold" id="userRoleDesktop">Warga</span>
+          </div>
+        </div>
+
+        <button onclick="handleLogout()" class="w-full py-2.5 px-4 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-bold transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-right-from-bracket"></i>
+          <span>Keluar Portal</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- MOBILE HEADER -->
+    <header class="md:hidden sticky top-0 z-30 bg-brand-indigo text-white px-4 py-3 shadow-md flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-brand-amber to-brand-pink flex items-center justify-center text-white shadow-sm">
+          <i class="fa-solid fa-people-roof text-sm"></i>
+        </div>
+        <div>
+          <h2 class="font-extrabold text-sm tracking-tight leading-none text-white">Wargakoe</h2>
+          <span class="text-[9px] text-brand-neon font-medium">RT 05 / RW 02</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <span class="text-[10px] px-2.5 py-1 rounded-full bg-white/10 text-white font-medium truncate max-w-[120px]" id="userRoleMobile">Warga</span>
+        <button onclick="handleLogout()" class="w-8 h-8 rounded-full bg-red-500/20 text-red-300 flex items-center justify-center text-xs">
+          <i class="fa-solid fa-right-from-bracket"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full pb-24 md:pb-8">
+
+      <!-- TOP GREETING BANNER -->
+      <div class="mb-6 rounded-3xl p-6 bg-gradient-to-r from-brand-amber via-brand-pink to-brand-indigo text-white shadow-xl relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div class="relative z-10">
+          <span class="text-xs font-bold tracking-wider uppercase bg-white/20 px-3 py-1 rounded-full backdrop-blur-md">
+            Portal Warga &amp; Pengurus
+          </span>
+          <h1 class="text-xl sm:text-2xl font-black mt-2" id="welcomeBannerText">Halo, Warga RT 05!</h1>
+          <p class="text-xs sm:text-sm text-white/90 mt-0.5">Mari wujudkan lingkungan rukun, transparan, dan teratur bersama Wargakoe.</p>
+        </div>
+        <div class="relative z-10 flex items-center gap-2">
+          <button onclick="refreshData()" class="px-4 py-2 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md text-xs font-bold flex items-center gap-1.5 transition">
+            <i class="fa-solid fa-arrows-rotate" id="refreshIcon"></i>
+            <span>Sinkron Data</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- TAB 1: DASHBOARD VIEW -->
+      <div id="tab-dashboard" class="space-y-6">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="dashboard-card p-4 flex items-center gap-3.5 border-l-4 border-l-brand-amber">
+            <div class="w-11 h-11 rounded-2xl bg-brand-amber/10 text-brand-amber flex items-center justify-center text-lg">
+              <i class="fa-solid fa-users"></i>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Total Warga</p>
+              <h4 class="text-lg sm:text-xl font-black text-slate-800" id="statTotalWarga">0</h4>
+            </div>
+          </div>
+
+          <div class="dashboard-card p-4 flex items-center gap-3.5 border-l-4 border-l-brand-pink">
+            <div class="w-11 h-11 rounded-2xl bg-brand-pink/10 text-brand-pink flex items-center justify-center text-lg">
+              <i class="fa-solid fa-house-user"></i>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Total KK</p>
+              <h4 class="text-lg sm:text-xl font-black text-slate-800" id="statTotalKk">0</h4>
+            </div>
+          </div>
+
+          <div class="dashboard-card p-4 flex items-center gap-3.5 border-l-4 border-l-brand-cyan">
+            <div class="w-11 h-11 rounded-2xl bg-brand-cyan/20 text-teal-700 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-wallet"></i>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Kas Terkumpul</p>
+              <h4 class="text-base sm:text-lg font-black text-slate-800" id="statTotalTerkumpul">Rp 0</h4>
+            </div>
+          </div>
+
+          <div class="dashboard-card p-4 flex items-center gap-3.5 border-l-4 border-l-brand-indigo">
+            <div class="w-11 h-11 rounded-2xl bg-brand-indigo/10 text-brand-indigo flex items-center justify-center text-lg">
+              <i class="fa-solid fa-clock-rotate-left"></i>
+            </div>
+            <div>
+              <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Menunggu Approval</p>
+              <h4 class="text-base sm:text-lg font-black text-slate-800" id="statMenungguApproval">Rp 0</h4>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="dashboard-card p-5 lg:col-span-1">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <i class="fa-solid fa-cake-candles text-brand-pink"></i>
+                <span>Demografi Usia Warga</span>
+              </h3>
+            </div>
+            <div class="space-y-3.5">
+              <div>
+                <div class="flex justify-between text-xs font-semibold text-slate-600 mb-1">
+                  <span>Balita (&lt; 5 Tahun)</span>
+                  <span id="demoBalitaVal" class="text-brand-pink font-bold">0 Jiwa</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                  <div id="demoBalitaBar" class="bg-brand-pink h-2 rounded-full transition-all-300" style="width: 0%"></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between text-xs font-semibold text-slate-600 mb-1">
+                  <span>Remaja (5 - 17 Tahun)</span>
+                  <span id="demoRemajaVal" class="text-brand-amber font-bold">0 Jiwa</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                  <div id="demoRemajaBar" class="bg-brand-amber h-2 rounded-full transition-all-300" style="width: 0%"></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between text-xs font-semibold text-slate-600 mb-1">
+                  <span>Dewasa (18 - 59 Tahun)</span>
+                  <span id="demoDewasaVal" class="text-brand-indigo font-bold">0 Jiwa</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                  <div id="demoDewasaBar" class="bg-brand-indigo h-2 rounded-full transition-all-300" style="width: 0%"></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between text-xs font-semibold text-slate-600 mb-1">
+                  <span>Lansia (60+ Tahun)</span>
+                  <span id="demoLansiaVal" class="text-teal-600 font-bold">0 Jiwa</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                  <div id="demoLansiaBar" class="bg-brand-cyan h-2 rounded-full transition-all-300" style="width: 0%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- REVISI BREAKDOWN KAS: Kas RT (Iuran RT) & Kas Kematian (Iuran Duka) -->
+          <div class="dashboard-card p-5 lg:col-span-2">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <i class="fa-solid fa-receipt text-brand-amber"></i>
+                <span>Realisasi Iuran Bulan Ini</span>
+              </h3>
+              <span class="text-xs font-semibold text-slate-400" id="currentMonthYearLabel">Agustus 2026</span>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 mb-4">
+              <!-- Kas RT (Iuran RT) -->
+              <div class="p-3 rounded-2xl bg-indigo-50 border border-indigo-100">
+                <div class="flex items-center justify-between mb-1.5">
+                  <span class="text-[11px] font-bold text-indigo-800">Kas RT</span>
+                  <i class="fa-solid fa-vault text-indigo-500 text-xs"></i>
+                </div>
+                <h4 class="text-xs sm:text-sm font-black text-indigo-900" id="sumKasRt">Rp 0</h4>
+              </div>
+
+              <!-- Kas Kematian (Iuran Duka) -->
+              <div class="p-3 rounded-2xl bg-slate-100 border border-slate-200">
+                <div class="flex items-center justify-between mb-1.5">
+                  <span class="text-[11px] font-bold text-slate-800">Kas Kematian</span>
+                  <i class="fa-solid fa-ribbon text-slate-500 text-xs"></i>
+                </div>
+                <h4 class="text-xs sm:text-sm font-black text-slate-900" id="sumKasKematian">Rp 0</h4>
+              </div>
+
+              <!-- Iuran Sampah -->
+              <div class="p-3 rounded-2xl bg-amber-50 border border-amber-100">
+                <div class="flex items-center justify-between mb-1.5">
+                  <span class="text-[11px] font-bold text-amber-800">Iuran Sampah</span>
+                  <i class="fa-solid fa-trash-can text-amber-500 text-xs"></i>
+                </div>
+                <h4 class="text-xs sm:text-sm font-black text-amber-900" id="sumIuranSampah">Rp 0</h4>
+              </div>
+
+              <!-- Iuran Sosial -->
+              <div class="p-3 rounded-2xl bg-pink-50 border border-pink-100">
+                <div class="flex items-center justify-between mb-1.5">
+                  <span class="text-[11px] font-bold text-pink-800">Iuran Sosial</span>
+                  <i class="fa-solid fa-hand-holding-heart text-pink-500 text-xs"></i>
+                </div>
+                <h4 class="text-xs sm:text-sm font-black text-pink-900" id="sumIuranSosial">Rp 0</h4>
+              </div>
+
+              <!-- Iuran Keamanan / Lain -->
+              <div class="p-3 rounded-2xl bg-teal-50 border border-teal-100">
+                <div class="flex items-center justify-between mb-1.5">
+                  <span class="text-[11px] font-bold text-teal-800">Iuran Lain</span>
+                  <i class="fa-solid fa-shield-halved text-teal-500 text-xs"></i>
+                </div>
+                <h4 class="text-xs sm:text-sm font-black text-teal-900" id="sumIuranLain">Rp 0</h4>
+              </div>
+            </div>
+
+            <div id="wargaPendingBanner" class="hidden p-4 rounded-2xl bg-red-50 border border-red-200">
+              <div class="flex items-start gap-3">
+                <i class="fa-solid fa-triangle-exclamation text-red-500 text-lg mt-0.5"></i>
+                <div>
+                  <h4 class="text-xs font-bold text-red-800">Tagihan Iuran Belum Dibayar</h4>
+                  <p class="text-[11px] text-red-600 mt-0.5" id="wargaPendingCountText">Anda memiliki tagihan iuran.</p>
+                  <button onclick="switchTab('iuran')" class="mt-2 text-xs font-bold px-3 py-1 bg-red-600 text-white rounded-lg shadow-sm hover:bg-red-700 transition">Bayar Sekarang</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard-card p-5">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <i class="fa-solid fa-bullhorn text-brand-indigo"></i>
+              <span>Pengumuman Mading Terbaru</span>
+            </h3>
+            <button onclick="switchTab('mading')" class="text-xs font-bold text-brand-pink hover:underline">Lihat Semua</button>
+          </div>
+          <div id="dashboardMadingList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+        </div>
+      </div>
+
+      <!-- TAB 2: DATA WARGA VIEW -->
+      <div id="tab-warga" class="hidden space-y-4">
+        <div class="dashboard-card p-5">
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-4">
+            <div>
+              <h3 class="text-base font-bold text-slate-800">Daftar Data Warga</h3>
+              <p class="text-xs text-slate-500">Kelola &amp; lihat informasi warga RT 05</p>
+            </div>
+            
+            <!-- TOOLBAR EXPORT & IMPORT (Tanpa tombol Registrasi Warga) -->
+            <div class="flex flex-wrap items-center gap-2">
+              <button onclick="exportWargaCSV()" class="px-3.5 py-2 rounded-full bg-emerald-600 text-white text-xs font-bold shadow-md hover:bg-emerald-700 transition flex items-center gap-1.5" title="Download Data Warga (CSV)">
+                <i class="fa-solid fa-file-excel"></i>
+                <span>Export CSV</span>
+              </button>
+
+              <div id="btnImportWargaContainer" class="hidden">
+                <button onclick="openModalImportWarga()" class="px-3.5 py-2 rounded-full bg-indigo-600 text-white text-xs font-bold shadow-md hover:bg-indigo-700 transition flex items-center gap-1.5" title="Import Data Warga dari CSV">
+                  <i class="fa-solid fa-file-import"></i>
+                  <span>Import CSV</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400 text-xs">
+                <i class="fa-solid fa-magnifying-glass"></i>
+              </span>
+              <input type="text" id="filterWargaSearch" oninput="debounceFetchWarga()" placeholder="Cari Nama, No HP, Alamat..." class="input-pill w-full pl-9 text-xs">
+            </div>
+            <select id="filterWargaRumah" onchange="fetchWargaData(0)" class="input-pill w-full text-xs">
+              <option value="SEMUA">Semua Status Rumah</option>
+              <option value="Pribadi">Pribadi</option>
+              <option value="Kontrak">Kontrak</option>
+              <option value="Kos">Kos</option>
+              <option value="Rumah Orang Tua">Rumah Orang Tua</option>
+            </select>
+            <select id="filterWargaRole" onchange="fetchWargaData(0)" class="input-pill w-full text-xs">
+              <option value="SEMUA">Semua Peran / Status</option>
+              <option value="Warga">Warga</option>
+              <option value="Pengurus RT">Pengurus RT</option>
+              <option value="Super Admin">Super Admin</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="dashboard-card overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-600">
+              <thead class="bg-brand-indigo text-white uppercase text-[10px] tracking-wider font-semibold">
+                <tr>
+                  <th class="p-3.5">Nama</th>
+                  <th class="p-3.5">Nomor Handphone / Kontak</th>
+                  <th class="p-3.5">Alamat Rumah</th>
+                  <th class="p-3.5">Status Rumah</th>
+                  <th class="p-3.5">Pekerjaan</th>
+                </tr>
+              </thead>
+              <tbody id="wargaTableBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+          <div class="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span class="text-slate-500" id="wargaPaginationInfo">Menampilkan 0 data</span>
+            <div class="flex items-center gap-1.5" id="wargaPaginationBtns"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: IURAN & KAS RT VIEW -->
+      <div id="tab-iuran" class="hidden space-y-4">
+        <div class="dashboard-card p-5">
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-4">
+            <div>
+              <h3 class="text-base font-bold text-slate-800">Manajemen Iuran RT</h3>
+              <p class="text-xs text-slate-500">Kelola dan pantau status pembayaran iuran warga</p>
+            </div>
+            <div id="pengurusIuranActions">
+              <button onclick="openModalGenerateIuran()" class="px-4 py-2.5 rounded-full bg-brand-amber text-white text-xs font-bold shadow-md hover:opacity-95 transition flex items-center gap-1.5">
+                <i class="fa-solid fa-plus-circle"></i>
+                <span>Terbitkan Tagihan Bulanan</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <select id="filterIuranStatus" onchange="fetchIuranData(0)" class="input-pill w-full text-xs">
+              <option value="SEMUA">Semua Status Bayar</option>
+              <option value="Lunas">Lunas</option>
+              <option value="Menunggu Approval">Menunggu Approval</option>
+              <option value="Belum Bayar">Belum Bayar</option>
+            </select>
+            <!-- REVISI FILTER: Tambahkan Iuran RT (Kas RT) & Iuran Duka (Kas Kematian) -->
+            <select id="filterIuranJenis" onchange="fetchIuranData(0)" class="input-pill w-full text-xs">
+              <option value="SEMUA">Semua Jenis Iuran</option>
+              <option value="Iuran RT">Iuran RT (Kas RT)</option>
+              <option value="Iuran Duka">Iuran Duka (Kas Kematian)</option>
+              <option value="Iuran Sampah">Iuran Sampah</option>
+              <option value="Iuran Sosial">Iuran Sosial</option>
+              <option value="Iuran Lain-lain">Iuran Lain-lain</option>
+            </select>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400 text-xs">
+                <i class="fa-solid fa-magnifying-glass"></i>
+              </span>
+              <input type="text" id="filterIuranSearch" oninput="debounceFetchIuran()" placeholder="Cari nama warga / ID..." class="input-pill w-full pl-9 text-xs">
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard-card overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs text-slate-600">
+              <thead class="bg-brand-indigo text-white uppercase text-[10px] tracking-wider font-semibold">
+                <tr>
+                  <th class="p-3.5">ID &amp; Warga</th>
+                  <th class="p-3.5">Periode &amp; Jenis</th>
+                  <th class="p-3.5">Nominal</th>
+                  <th class="p-3.5">Status Bayar</th>
+                  <th class="p-3.5">Verifikator</th>
+                  <th class="p-3.5 text-center">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="iuranTableBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+          <div class="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span class="text-slate-500" id="iuranPaginationInfo">Menampilkan 0 data</span>
+            <div class="flex items-center gap-1.5" id="iuranPaginationBtns"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: KELUARGA SAYA -->
+      <div id="tab-keluarga" class="hidden space-y-6">
+        <div class="dashboard-card p-6 bg-gradient-to-br from-white to-slate-50 border border-slate-200">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+            <div class="flex items-center gap-4">
+              <div class="w-14 h-14 rounded-2xl bg-brand-indigo text-brand-neon font-black text-xl flex items-center justify-center shadow-md">
+                <i class="fa-solid fa-house-chimney-user"></i>
+              </div>
+              <div>
+                <h3 class="text-lg font-bold text-slate-800" id="myFamilyHeadName">Nama Kepala Keluarga</h3>
+                <p class="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
+                  <span>No KK: <strong id="myFamilyKkNumber" class="text-brand-indigo">0000000000000000</strong></span>
+                  <span class="w-1 h-1 rounded-full bg-slate-400"></span>
+                  <span id="myFamilyAddress">Alamat Lengkap</span>
+                </p>
+              </div>
+            </div>
+            <button onclick="openModalTambahAnggota()" class="px-4 py-2.5 rounded-full bg-brand-pink text-white text-xs font-bold shadow-md hover:opacity-95 transition flex items-center gap-1.5">
+              <i class="fa-solid fa-user-plus"></i>
+              <span>Tambah Anggota Keluarga</span>
+            </button>
+          </div>
+
+          <div class="mt-6">
+            <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <i class="fa-solid fa-users text-brand-amber"></i>
+              <span>Daftar Anggota Keluarga Dalam 1 KK</span>
+            </h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="anggotaKeluargaContainer"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 5: INFORMASI MADING -->
+      <div id="tab-mading" class="hidden space-y-4">
+        <div class="dashboard-card p-5">
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-4">
+            <div>
+              <h3 class="text-base font-bold text-slate-800">Informasi Mading &amp; Pengumuman RT</h3>
+              <p class="text-xs text-slate-500">Pusat informasi resmi kegiatan dan pengumuman warga RT 05</p>
+            </div>
+            <div id="madingActionContainer">
+              <button onclick="openModalTambahMading()" class="px-4 py-2.5 rounded-full bg-brand-pink text-white text-xs font-bold shadow-md hover:opacity-95 transition flex items-center gap-1.5">
+                <i class="fa-solid fa-plus"></i>
+                <span>Buat Pengumuman Baru</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400 text-xs">
+              <i class="fa-solid fa-magnifying-glass"></i>
+            </span>
+            <input type="text" id="filterMadingSearch" oninput="fetchMadingData()" placeholder="Cari judul atau isi pengumuman..." class="input-pill w-full pl-9 text-xs">
+          </div>
+        </div>
+
+        <div id="madingListContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+      </div>
+
+    </main>
+
+    <!-- MOBILE BOTTOM NAVIGATION -->
+    <nav class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 flex justify-around p-1 shadow-2xl">
+      <button onclick="switchTab('dashboard')" id="mobileNav-dashboard" class="flex flex-col items-center py-1 px-2 text-brand-indigo font-bold text-[9px]">
+        <i class="fa-solid fa-chart-pie text-sm mb-0.5"></i>
+        <span>Home</span>
+      </button>
+      <button onclick="switchTab('warga')" id="mobileNav-warga" class="flex flex-col items-center py-1 px-2 text-slate-400 hover:text-brand-indigo text-[9px]">
+        <i class="fa-solid fa-address-book text-sm mb-0.5"></i>
+        <span>Warga</span>
+      </button>
+      <button onclick="switchTab('iuran')" id="mobileNav-iuran" class="flex flex-col items-center py-1 px-2 text-slate-400 hover:text-brand-indigo text-[9px]">
+        <i class="fa-solid fa-money-bill-wave text-sm mb-0.5"></i>
+        <span>Iuran</span>
+      </button>
+      <button onclick="switchTab('keluarga')" id="mobileNav-keluarga" class="flex flex-col items-center py-1 px-2 text-slate-400 hover:text-brand-indigo text-[9px]">
+        <i class="fa-solid fa-house-user text-sm mb-0.5"></i>
+        <span>Keluarga</span>
+      </button>
+      <button onclick="switchTab('mading')" id="mobileNav-mading" class="flex flex-col items-center py-1 px-2 text-slate-400 hover:text-brand-indigo text-[9px]">
+        <i class="fa-solid fa-bullhorn text-sm mb-0.5"></i>
+        <span>Mading</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <?!= include('modals'); ?>
+  <?!= include('js'); ?>
+
+</body>
+</html>
