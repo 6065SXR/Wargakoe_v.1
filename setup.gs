@@ -3,12 +3,8 @@
  * WARGAKOE - DATABASE SETUP & SAFE MIGRATION
  * By Zettbos System (ZettBOT 3.1)
  * ====================================================================
- * Deskripsi:
- * Script inisialisasi dan migrasi database non-destruktif.
- * Memeriksa sheet dan header kolom tanpa menghapus data pengguna yang ada.
  */
 
-// Konfigurasi Nama Sheet dan Header Kolom
 var DB_SCHEMA = {
   USERS: {
     name: 'USERS',
@@ -70,55 +66,55 @@ var DB_SCHEMA = {
       'Pembuat',
       'Created_At'
     ]
+  },
+  KAS_RT: {
+    name: 'KAS_RT',
+    headers: [
+      'ID_Kas',
+      'Tanggal',
+      'Jenis_Kas',
+      'Kategori',
+      'Keterangan',
+      'Nominal',
+      'Bulan_Tahun',
+      'Created_At'
+    ]
   }
 };
 
-/**
- * Fungsi Utama: Menjalankan setup dan migrasi database secara aman
- */
 function setupDatabase() {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var results = [];
 
-    // 1. Inisialisasi atau migrasi setiap sheet dalam skema
     for (var key in DB_SCHEMA) {
       if (DB_SCHEMA.hasOwnProperty(key)) {
         var table = DB_SCHEMA[key];
         var sheet = ss.getSheetByName(table.name);
 
         if (!sheet) {
-          // Buat sheet baru jika belum ada
           sheet = ss.insertSheet(table.name);
           setupHeaders_(sheet, table.headers);
           results.push('Sheet ' + table.name + ' berhasil dibuat.');
         } else {
-          // Migrasi header secara non-destruktif
           migrateHeaders_(sheet, table.headers);
-          results.push('Sheet ' + table.name + ' telah diverifikasi/diperbarui.');
+          results.push('Sheet ' + table.name + ' diverifikasi.');
         }
       }
     }
 
-    // 2. Buat data dummy awal jika database masih kosong
     seedInitialData_(ss);
-
     SpreadsheetApp.flush();
-    Logger.log('Setup Database Wargakoe selesai: \n' + results.join('\n'));
     return { success: true, message: 'Database Wargakoe berhasil diinisialisasi.', details: results };
   } catch (error) {
-    Logger.log('Error setupDatabase: ' + error.toString());
     return { success: false, message: 'Gagal setup database: ' + error.toString() };
   }
 }
 
-/**
- * Helper: Mengatur styling dan memasukkan header pada sheet baru
- */
 function setupHeaders_(sheet, headers) {
   var headerRange = sheet.getRange(1, 1, 1, headers.length);
   headerRange.setValues([headers]);
-  headerRange.setBackground('#221d52'); // Dark Indigo
+  headerRange.setBackground('#221d52');
   headerRange.setFontColor('#ffffff');
   headerRange.setFontWeight('bold');
   headerRange.setHorizontalAlignment('center');
@@ -126,9 +122,6 @@ function setupHeaders_(sheet, headers) {
   sheet.autoResizeColumns(1, headers.length);
 }
 
-/**
- * Helper: Migrasi header secara non-destruktif tanpa menghapus data yang ada
- */
 function migrateHeaders_(sheet, expectedHeaders) {
   var lastRow = sheet.getLastRow();
   var lastCol = sheet.getLastColumn();
@@ -147,7 +140,6 @@ function migrateHeaders_(sheet, expectedHeaders) {
     }
   }
 
-  // Tambahkan kolom baru di sebelah kanan jika ada header yang kurang
   if (missingHeaders.length > 0) {
     var startCol = lastCol + 1;
     var newRange = sheet.getRange(1, startCol, 1, missingHeaders.length);
@@ -160,26 +152,22 @@ function migrateHeaders_(sheet, expectedHeaders) {
   }
 }
 
-/**
- * Helper: Memasukkan data dummy awal untuk demo multi-role jika sheet kosong
- */
 function seedInitialData_(ss) {
   var nowStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
   
-  // 1. Seed USERS jika hanya ada header
   var userSheet = ss.getSheetByName(DB_SCHEMA.USERS.name);
   if (userSheet && userSheet.getLastRow() <= 1) {
     var dummyUsers = [
       [
         '3171010000000001', '3171010101850001', 'Budi Santoso', '081234567890',
         'admin123', 'Super Admin', 'Pengurus RT', '15/01/1985', '39',
-        'Jl. Mawar No. 01 RT 05/RW 02', 'Laki-laki', 'Suami', 'Pribadi',
+        'Kamp. Baru I Jl. Marga Mulya No. 01 RT 05/RW 02', 'Laki-laki', 'Suami', 'Pribadi',
         'Sarjana', 'Pegawai Negeri', nowStr
       ],
       [
         '3171010000000002', '3171010102900002', 'Siti Rahmawati', '081234567891',
         'bendahara123', 'Bendahara', 'Pengurus RT', '20/05/1990', '34',
-        'Jl. Melati No. 04 RT 05/RW 02', 'Perempuan', 'Istri', 'Pribadi',
+        'Kamp. Baru I Jl. Marga Mulya No. 04 RT 05/RW 02', 'Perempuan', 'Istri', 'Pribadi',
         'Sarjana', 'Wiraswasta', nowStr
       ],
       [
@@ -191,14 +179,13 @@ function seedInitialData_(ss) {
       [
         '3171010000000004', '3171010104600004', 'Haji Abdullah', '081234567893',
         'warga123', 'Warga', 'Warga', '05/03/1960', '64',
-        'Jl. Kenanga No. 08 RT 05/RW 02', 'Laki-laki', 'Ayah', 'Pribadi',
+        'Kamp. Baru I Jl. Marga Mulya No. 08 RT 05/RW 02', 'Laki-laki', 'Ayah', 'Pribadi',
         'SMA', 'Wiraswasta', nowStr
       ]
     ];
     userSheet.getRange(2, 1, dummyUsers.length, dummyUsers[0].length).setValues(dummyUsers);
   }
 
-  // 2. Seed ANGGOTA_KELUARGA jika kosong
   var agtSheet = ss.getSheetByName(DB_SCHEMA.ANGGOTA_KELUARGA.name);
   if (agtSheet && agtSheet.getLastRow() <= 1) {
     var dummyAnggota = [
@@ -211,13 +198,12 @@ function seedInitialData_(ss) {
     agtSheet.getRange(2, 1, dummyAnggota.length, dummyAnggota[0].length).setValues(dummyAnggota);
   }
 
-  // 3. Seed IURAN jika kosong
   var iurSheet = ss.getSheetByName(DB_SCHEMA.IURAN.name);
   if (iurSheet && iurSheet.getLastRow() <= 1) {
     var currentBulan = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'MMMM yyyy');
     var dummyIuran = [
-      ['IUR-0001', '3171010000000001', 'Budi Santoso', currentBulan, 'Iuran Sampah', '25000', 'Lunas', nowStr, 'Siti Rahmawati', nowStr],
-      ['IUR-0002', '3171010000000001', 'Budi Santoso', currentBulan, 'Iuran Sosial', '15000', 'Lunas', nowStr, 'Siti Rahmawati', nowStr],
+      ['IUR-0001', '3171010000000001', 'Budi Santoso', currentBulan, 'Iuran RT', '25000', 'Lunas', nowStr, 'Siti Rahmawati', nowStr],
+      ['IUR-0002', '3171010000000001', 'Budi Santoso', currentBulan, 'Iuran Duka', '15000', 'Lunas', nowStr, 'Siti Rahmawati', nowStr],
       ['IUR-0003', '3171010000000003', 'Agus Setiawan', currentBulan, 'Iuran Sampah', '25000', 'Menunggu Approval', nowStr, '-', nowStr],
       ['IUR-0004', '3171010000000003', 'Agus Setiawan', currentBulan, 'Iuran Sosial', '15000', 'Belum Bayar', '-', '-', nowStr],
       ['IUR-0005', '3171010000000004', 'Haji Abdullah', currentBulan, 'Iuran Lain-lain', '50000', 'Lunas', nowStr, 'Siti Rahmawati', nowStr]
@@ -225,7 +211,6 @@ function seedInitialData_(ss) {
     iurSheet.getRange(2, 1, dummyIuran.length, dummyIuran[0].length).setValues(dummyIuran);
   }
 
-  // 4. Seed MADING jika kosong
   var madingSheet = ss.getSheetByName(DB_SCHEMA.MADING.name);
   if (madingSheet && madingSheet.getLastRow() <= 1) {
     var dummyMading = [
@@ -233,5 +218,17 @@ function seedInitialData_(ss) {
       ['MAD-0002', 'Rapat Pleno Warga & Pembahasan Kas', '25 September 2026', 'Pertemuan rutin bulanan bertempat di balai warga lantai 1 pukul 19:30 WIB.', 'Published', 'Siti Rahmawati (Bendahara)', nowStr]
     ];
     madingSheet.getRange(2, 1, dummyMading.length, dummyMading[0].length).setValues(dummyMading);
+  }
+
+  var kasSheet = ss.getSheetByName(DB_SCHEMA.KAS_RT.name);
+  if (kasSheet && kasSheet.getLastRow() <= 1) {
+    var curBulanYear = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'MMMM yyyy');
+    var dummyKas = [
+      ['KAS-0001', '01/08/2026', 'Pemasukan', 'Iuran RT', 'Penerimaan Iuran Bulanan Warga RT 05', '1250000', curBulanYear, nowStr],
+      ['KAS-0002', '03/08/2026', 'Pemasukan', 'Donasi', 'Sumbangan Donatur Kegiatan RT', '500000', curBulanYear, nowStr],
+      ['KAS-0003', '05/08/2026', 'Pengeluaran', 'Kebersihan', 'Pembelian Alat Kebersihan & Sapu Pos Ronda', '150000', curBulanYear, nowStr],
+      ['KAS-0004', '12/08/2026', 'Pengeluaran', 'Fasilitas', 'Perbaikan Lampu Jalan Gang Utama RT 05', '200000', curBulanYear, nowStr]
+    ];
+    kasSheet.getRange(2, 1, dummyKas.length, dummyKas[0].length).setValues(dummyKas);
   }
 }
