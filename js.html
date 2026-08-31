@@ -19,11 +19,21 @@
 
     var dateNow = new Date();
     var months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-    var monthYearStr = months[dateNow.getMonth()] + ' ' + dateNow.getFullYear();
+    var currentMonthStr = months[dateNow.getMonth()];
+    var currentYearStr = String(dateNow.getFullYear());
+    var monthYearStr = currentMonthStr + ' ' + currentYearStr;
+
     var curLbl = document.getElementById('currentMonthYearLabel');
     if (curLbl) curLbl.innerText = monthYearStr;
+
     var genLbl = document.getElementById('genBulanTahun');
     if (genLbl) genLbl.value = monthYearStr;
+
+    // Set default filter bulan dan tahun untuk Detail Kas RT
+    var kMonth = document.getElementById('kasRtFilterBulan');
+    if (kMonth) kMonth.value = currentMonthStr;
+    var kYear = document.getElementById('kasRtFilterTahun');
+    if (kYear) kYear.value = currentYearStr;
   };
 
   function checkInitialAuth() {
@@ -36,7 +46,7 @@
         noHp: '081234567890',
         role: 'Super Admin',
         statusUser: 'Pengurus RT',
-        alamat: 'Jl. Mawar No. 01 RT 05/RW 02'
+        alamat: 'Kamp. Baru I Jl. Marga Mulya No. 01 RT 05/RW 02'
       };
       showMainDashboard();
       return;
@@ -113,7 +123,7 @@
           nama: 'Budi Santoso',
           role: 'Super Admin',
           statusUser: 'Pengurus RT',
-          alamat: 'Jl. Mawar No. 01'
+          alamat: 'Kamp. Baru I Jl. Marga Mulya No. 01'
         };
         showToast('Login Demo Berhasil', 'success');
         showMainDashboard();
@@ -186,8 +196,9 @@
       document.getElementById('userAvatarDesktop').innerText = (currentUser.nama || 'U').charAt(0).toUpperCase();
       document.getElementById('welcomeBannerText').innerText = 'Halo, ' + currentUser.nama + '!';
 
-      var isPengurus = (currentUser.role === 'Super Admin' || currentUser.statusUser === 'Pengurus RT');
-      if (currentUser.role === 'Warga') {
+      var isPengurus = (currentUser.role === 'Super Admin' || currentUser.statusUser === 'Pengurus RT' || currentUser.role === 'Pengurus RT' || currentUser.role === 'Ketua RT' || currentUser.role === 'Bendahara' || currentUser.role === 'Sekretaris');
+
+      if (currentUser.role === 'Warga' && !isPengurus) {
         var btnGen = document.getElementById('pengurusIuranActions');
         if (btnGen) btnGen.classList.add('hidden');
       }
@@ -200,11 +211,8 @@
 
       var btnImportContainer = document.getElementById('btnImportWargaContainer');
       if (btnImportContainer) {
-        if (currentUser.role === 'Super Admin') {
-          btnImportContainer.classList.remove('hidden');
-        } else {
-          btnImportContainer.classList.add('hidden');
-        }
+        if (currentUser.role === 'Super Admin') btnImportContainer.classList.remove('hidden');
+        else btnImportContainer.classList.add('hidden');
       }
     }
 
@@ -242,6 +250,7 @@
     else if (tabId === 'iuran') fetchIuranData(0);
     else if (tabId === 'keluarga') fetchFamilyData();
     else if (tabId === 'mading') fetchMadingData();
+    else if (tabId === 'dashboard') fetchKasRtDetails();
   }
 
   function refreshData() {
@@ -272,8 +281,8 @@
           remaja: 6,
           dewasa: 12,
           lansia: 3,
-          kasRtBulanIni: 400000,        // Kas RT (Iuran RT)
-          kasKematianBulanIni: 100000,  // Kas Kematian (Iuran Duka)
+          kasRtBulanIni: 400000,
+          kasKematianBulanIni: 100000,
           iuranSampahBulanIni: 350000,
           iuranSosialBulanIni: 200000,
           iuranLainBulanIni: 200000,
@@ -284,6 +293,8 @@
         });
       }, 400);
     }
+
+    fetchKasRtDetails();
   }
 
   function renderDashboardStats(stats) {
@@ -294,7 +305,6 @@
     document.getElementById('statTotalTerkumpul').innerText = formatRupiah(stats.totalTerkumpul || 0);
     document.getElementById('statMenungguApproval').innerText = formatRupiah(stats.totalMenunggu || 0);
 
-    // REVISI DASHBOARD BINDING: Kas RT (Iuran RT) & Kas Kematian (Iuran Duka)
     var elKasRt = document.getElementById('sumKasRt');
     if (elKasRt) elKasRt.innerText = formatRupiah(stats.kasRtBulanIni || 0);
 
@@ -351,6 +361,73 @@
     }
   }
 
+  function fetchKasRtDetails() {
+    var bulanSelect = document.getElementById('kasRtFilterBulan');
+    var tahunSelect = document.getElementById('kasRtFilterTahun');
+    if (!bulanSelect || !tahunSelect) return;
+
+    var bulanTahun = bulanSelect.value + ' ' + tahunSelect.value;
+    var tbody = document.getElementById('kasRtTableBody');
+    tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat rincian Kas RT...</td></tr>';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success) renderKasRtTable(res);
+        })
+        .getKasRtDetails(bulanTahun);
+    } else {
+      setTimeout(function() {
+        renderKasRtTable({
+          data: [
+            { tanggal: '01/08/2026', jenisKas: 'Pemasukan', kategori: 'Iuran RT', keterangan: 'Penerimaan Iuran Bulanan Warga RT 05', nominal: 1250000 },
+            { tanggal: '03/08/2026', jenisKas: 'Pemasukan', kategori: 'Donasi', keterangan: 'Sumbangan Donatur Kegiatan RT', nominal: 500000 },
+            { tanggal: '05/08/2026', jenisKas: 'Pengeluaran', kategori: 'Kebersihan', keterangan: 'Pembelian Alat Kebersihan Pos Ronda', nominal: 150000 },
+            { tanggal: '12/08/2026', jenisKas: 'Pengeluaran', kategori: 'Fasilitas', keterangan: 'Perbaikan Lampu Jalan Gang Utama', nominal: 200000 }
+          ],
+          totalPemasukan: 1750000,
+          totalPengeluaran: 350000,
+          sisaSaldo: 1400000
+        });
+      }, 300);
+    }
+  }
+
+  function renderKasRtTable(res) {
+    var tbody = document.getElementById('kasRtTableBody');
+    tbody.innerHTML = '';
+
+    document.getElementById('kasRtTotalPemasukan').innerText = formatRupiah(res.totalPemasukan || 0);
+    document.getElementById('kasRtTotalPengeluaran').innerText = formatRupiah(res.totalPengeluaran || 0);
+    document.getElementById('kasRtSisaSaldo').innerText = formatRupiah(res.sisaSaldo || 0);
+
+    if (!res.data || res.data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-400">Belum ada catatan mutasi kas pada bulan ini.</td></tr>';
+      return;
+    }
+
+    for (var i = 0; i < res.data.length; i++) {
+      var k = res.data[i];
+      var tr = document.createElement('tr');
+      tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+
+      var badgeJenis = k.jenisKas === 'Pemasukan'
+        ? '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800"><i class="fa-solid fa-arrow-down mr-1"></i>Pemasukan</span>'
+        : '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800"><i class="fa-solid fa-arrow-up mr-1"></i>Pengeluaran</span>';
+
+      var nominalColor = k.jenisKas === 'Pemasukan' ? 'text-emerald-700' : 'text-rose-600';
+      var nominalPrefix = k.jenisKas === 'Pemasukan' ? '+ ' : '- ';
+
+      tr.innerHTML = 
+        '<td class="p-3 font-semibold text-slate-700 whitespace-nowrap">' + k.tanggal + '</td>' +
+        '<td class="p-3"><div>' + badgeJenis + '</div><span class="text-[10px] text-slate-400 font-medium mt-0.5 block">' + k.kategori + '</span></td>' +
+        '<td class="p-3 text-slate-700 font-medium">' + k.keterangan + '</td>' +
+        '<td class="p-3 text-right font-bold ' + nominalColor + ' whitespace-nowrap">' + nominalPrefix + formatRupiah(k.nominal) + '</td>';
+
+      tbody.appendChild(tr);
+    }
+  }
+
   function debounceFetchWarga() {
     clearTimeout(debounceTimerWarga);
     debounceTimerWarga = setTimeout(function() { fetchWargaData(0); }, 350);
@@ -373,7 +450,7 @@
     } else {
       setTimeout(function() {
         renderWargaTable({
-          data: [{ nama: 'Budi Santoso', noHp: '081234567890', alamat: 'Jl. Mawar No. 01 RT 05/RW 02', statusRumah: 'Pribadi', pekerjaan: 'Pegawai Negeri' }],
+          data: [{ nama: 'Budi Santoso', noHp: '081234567890', alamat: 'Kamp. Baru I Jl. Marga Mulya No. 01', statusRumah: 'Pribadi', pekerjaan: 'Pegawai Negeri' }],
           total: 1, page: 1, totalPages: 1
         });
       }, 300);
@@ -420,7 +497,7 @@
     } else {
       setTimeout(function() {
         var dummyExport = [
-          { noKk: '3171010000000001', noKtp: '3171010101850001', nama: 'Budi Santoso', noHp: '081234567890', role: 'Super Admin', statusUser: 'Pengurus RT', tanggalLahir: '15/01/1985', umur: '39', alamat: 'Jl. Mawar No. 01', jenisKelamin: 'Laki-laki', statusKeluarga: 'Suami', statusRumah: 'Pribadi', pendidikan: 'Sarjana', pekerjaan: 'Pegawai Negeri' }
+          { noKk: '3171010000000001', noKtp: '3171010101850001', nama: 'Budi Santoso', noHp: '081234567890', role: 'Super Admin', statusUser: 'Pengurus RT', tanggalLahir: '15/01/1985', umur: '39', alamat: 'Kamp. Baru I Jl. Marga Mulya No. 01', jenisKelamin: 'Laki-laki', statusKeluarga: 'Suami', statusRumah: 'Pribadi', pendidikan: 'Sarjana', pekerjaan: 'Pegawai Negeri' }
         ];
         triggerCSVDownload(dummyExport, 'Data_Warga_Demo.csv');
         showToast('Export Demo Berhasil', 'success');
@@ -457,7 +534,7 @@
 
   function downloadWargaTemplateCSV() {
     var template = [
-      { No_KK: '3171010000000099', No_KTP: '3171010101850099', Nama: 'Warga Contoh', No_HP: '081299998888', Password: 'warga123', Role: 'Warga', Status_User: 'Warga', Tanggal_Lahir: '10/10/1990', Umur: '34', Alamat: 'Jl. Mawar No. 99', Jenis_Kelamin: 'Laki-laki', Status_Keluarga: 'Suami', Status_Rumah: 'Pribadi', Pendidikan: 'SMA', Pekerjaan: 'Pegawai Swasta' }
+      { No_KK: '3171010000000099', No_KTP: '3171010101850099', Nama: 'Warga Contoh', No_HP: '081299998888', Password: 'warga123', Role: 'Warga', Status_User: 'Warga', Tanggal_Lahir: '10/10/1990', Umur: '34', Alamat: 'Kamp. Baru I Jl. Marga Mulya No. 99', Jenis_Kelamin: 'Laki-laki', Status_Keluarga: 'Suami', Status_Rumah: 'Pribadi', Pendidikan: 'SMA', Pekerjaan: 'Pegawai Swasta' }
     ];
     triggerCSVDownload(template, 'Template_Import_Warga.csv');
   }
@@ -729,7 +806,7 @@
     } else {
       setTimeout(function() {
         renderFamilyDetails({
-          kepalaKeluarga: { nama: 'Budi Santoso', noKk: noKk, alamat: 'Jl. Mawar No. 01' },
+          kepalaKeluarga: { nama: 'Budi Santoso', noKk: noKk, alamat: 'Kamp. Baru I Jl. Marga Mulya No. 01' },
           anggota: [{ idAnggota: 'AGT-0001', noKk: noKk, namaAnggota: 'Dewi Lestari', hubunganKeluarga: 'Istri', tanggalLahir: '12/04/1988', umur: '36', jenisKelamin: 'Perempuan' }]
         });
       }, 300);
