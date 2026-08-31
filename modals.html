@@ -1,0 +1,180 @@
+<div id="modalAnggota" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+  <div class="dashboard-card w-full max-w-md p-6 relative">
+    <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+      <h3 class="text-sm font-bold text-slate-800" id="modalAnggotaTitle">Tambah Anggota Keluarga</h3>
+      <button onclick="closeModal('modalAnggota')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-base"></i></button>
+    </div>
+    <form id="formAnggota" onsubmit="event.preventDefault(); handleSaveAnggota();" class="space-y-3 text-xs">
+      <input type="hidden" id="formAnggotaId" value="">
+      
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Nomor Kartu Keluarga (KK)</label>
+        <input type="text" id="formAnggotaKk" readonly placeholder="No. KK" class="input-pill w-full bg-slate-100 font-bold text-slate-500 cursor-not-allowed">
+      </div>
+
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Nama Anggota Keluarga</label>
+        <input type="text" id="formAnggotaNama" required placeholder="Contoh: Siti Aisyah" class="input-pill w-full">
+      </div>
+
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Hubungan Keluarga</label>
+        <select id="formAnggotaHubungan" class="input-pill w-full">
+          <option value="Istri">Istri</option>
+          <option value="Suami">Suami</option>
+          <option value="Anak ke-1">Anak ke-1</option>
+          <option value="Anak ke-2">Anak ke-2</option>
+          <option value="Anak ke-3">Anak ke-3</option>
+          <option value="Anak ke-4">Anak ke-4</option>
+          <option value="Anak ke-5">Anak ke-5</option>
+          <option value="Adik">Adik</option>
+          <option value="Kakak">Kakak</option>
+          <option value="Orang Tua">Orang Tua (Ayah/Ibu)</option>
+          <option value="Saudara">Saudara Serumah</option>
+        </select>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Tanggal Lahir</label>
+          <input type="date" id="formAnggotaTglLahir" required onchange="calculateAgeRealtime(this.value, 'formAnggotaUmurDisplay', 'formAnggotaUmurVal')" class="input-pill w-full">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Umur (Tahun)</label>
+          <input type="text" id="formAnggotaUmurDisplay" readonly placeholder="0 Thn" class="input-pill w-full bg-slate-100 font-bold text-brand-indigo">
+          <input type="hidden" id="formAnggotaUmurVal" value="0">
+        </div>
+      </div>
+
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Jenis Kelamin</label>
+        <select id="formAnggotaGender" class="input-pill w-full">
+          <option value="Perempuan">Perempuan</option>
+          <option value="Laki-laki">Laki-laki</option>
+        </select>
+      </div>
+
+      <div class="pt-3 flex items-center justify-end gap-2">
+        <button type="button" onclick="closeModal('modalAnggota')" class="px-4 py-2.5 rounded-full border border-slate-200 text-slate-600 font-bold">Batal</button>
+        <button type="submit" id="btnSaveAnggota" class="px-5 py-2.5 rounded-full bg-brand-pink text-white font-bold shadow-md hover:opacity-95">Simpan Data</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL: GENERATE TAGIHAN (Dengan Opsi Iuran RT & Iuran Duka) -->
+<div id="modalGenerateIuran" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+  <div class="dashboard-card w-full max-w-md p-6 relative">
+    <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+      <h3 class="text-sm font-bold text-slate-800">Terbitkan Tagihan Iuran Massal</h3>
+      <button onclick="closeModal('modalGenerateIuran')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-base"></i></button>
+    </div>
+    <form id="formGenerateIuran" onsubmit="event.preventDefault(); handleGenerateIuranMassal();" class="space-y-3.5 text-xs">
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Periode Bulan &amp; Tahun</label>
+        <input type="text" id="genBulanTahun" required placeholder="Contoh: September 2026" class="input-pill w-full">
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Jenis Iuran</label>
+        <!-- REVISI DROPDOWN: Tambahkan Iuran RT & Iuran Duka -->
+        <select id="genJenisIuran" class="input-pill w-full">
+          <option value="Iuran RT">Iuran RT (Kas RT)</option>
+          <option value="Iuran Duka">Iuran Duka (Kas Kematian)</option>
+          <option value="Iuran Sampah">Iuran Sampah</option>
+          <option value="Iuran Sosial">Iuran Sosial</option>
+          <option value="Iuran Lain-lain">Iuran Lain-lain / Keamanan</option>
+        </select>
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Nominal per KK (Rp)</label>
+        <input type="number" id="genNominal" required placeholder="25000" class="input-pill w-full font-bold">
+      </div>
+      <div class="pt-3 flex items-center justify-end gap-2">
+        <button type="button" onclick="closeModal('modalGenerateIuran')" class="px-4 py-2.5 rounded-full border border-slate-200 text-slate-600 font-bold">Batal</button>
+        <button type="submit" id="btnSubmitGenerate" class="px-5 py-2.5 rounded-full bg-brand-amber text-white font-bold shadow-md hover:opacity-95">Terbitkan Sekarang</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="modalMading" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+  <div class="dashboard-card w-full max-w-lg p-6 relative">
+    <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+      <h3 class="text-sm font-bold text-slate-800" id="modalMadingTitle">Buat Pengumuman Mading</h3>
+      <button onclick="closeModal('modalMading')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-base"></i></button>
+    </div>
+    <form id="formMading" onsubmit="event.preventDefault(); handleSaveMading();" class="space-y-3.5 text-xs">
+      <input type="hidden" id="formMadingId" value="">
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Judul Pengumuman</label>
+        <input type="text" id="formMadingJudul" required placeholder="Contoh: Kerja Bakti Massal RT 05" class="input-pill w-full">
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Tanggal Kegiatan</label>
+        <input type="text" id="formMadingTgl" required placeholder="Contoh: 15 September 2026" class="input-pill w-full">
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Note / Isi Informasi</label>
+        <textarea id="formMadingNote" rows="4" required placeholder="Tuliskan isi pengumuman..." class="w-full p-3 rounded-2xl border border-slate-200 outline-none focus:border-brand-amber text-xs"></textarea>
+      </div>
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Status Publikasi</label>
+        <select id="formMadingStatus" class="input-pill w-full">
+          <option value="Published">Publish (Tampilkan ke Warga)</option>
+          <option value="Draft">Draft (Simpan Saja)</option>
+        </select>
+      </div>
+      <div class="pt-3 flex items-center justify-end gap-2">
+        <button type="button" onclick="closeModal('modalMading')" class="px-4 py-2.5 rounded-full border border-slate-200 text-slate-600 font-bold">Batal</button>
+        <button type="submit" id="btnSaveMading" class="px-5 py-2.5 rounded-full bg-brand-pink text-white font-bold shadow-md hover:opacity-95">Simpan &amp; Publikasikan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="modalImportWarga" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+  <div class="dashboard-card w-full max-w-lg p-6 relative">
+    <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-file-import text-indigo-600 text-base"></i>
+        <h3 class="text-sm font-bold text-slate-800">Import Data Warga (CSV / Excel)</h3>
+      </div>
+      <button onclick="closeModal('modalImportWarga')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-base"></i></button>
+    </div>
+
+    <div class="space-y-4 text-xs">
+      <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-[11px] leading-relaxed">
+        <i class="fa-solid fa-circle-info mr-1 text-amber-600"></i>
+        <strong>Petunjuk Import:</strong> Pastikan format header kolom CSV sesuai. Jika ditemukan nomor KK atau NIK yang sudah terdaftar di database, data tersebut akan dilewati dan dilaporkan.
+      </div>
+
+      <div class="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
+        <span class="font-medium text-slate-700 text-[11px]">Belum memiliki format? Download template CSV:</span>
+        <button onclick="downloadWargaTemplateCSV()" class="px-3 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-[11px] transition">
+          <i class="fa-solid fa-download mr-1"></i>Template CSV
+        </button>
+      </div>
+
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1.5">Pilih File CSV Data Warga</label>
+        <input type="file" id="importFileCsv" accept=".csv" class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-brand-indigo file:text-white hover:file:bg-brand-dark cursor-pointer">
+      </div>
+
+      <div id="importResultNotice" class="hidden p-3 rounded-xl border text-xs leading-relaxed max-h-40 overflow-y-auto"></div>
+
+      <div class="pt-2 flex items-center justify-end gap-2">
+        <button type="button" onclick="closeModal('modalImportWarga')" class="px-4 py-2 rounded-full border border-slate-200 text-slate-600 font-bold">Tutup</button>
+        <button type="button" id="btnProsesImport" onclick="processImportWarga()" class="px-5 py-2 rounded-full bg-indigo-600 text-white font-bold shadow-md hover:bg-indigo-700 transition">
+          Mulai Import
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toastNotification" class="fixed top-4 right-4 z-50 transform translate-y-[-150%] transition-transform duration-300 pointer-events-none">
+  <div id="toastCard" class="flex items-center gap-3 px-4 py-3 rounded-2xl bg-brand-dark text-white shadow-2xl border border-white/20 text-xs font-medium max-w-sm pointer-events-auto">
+    <i id="toastIcon" class="fa-solid fa-circle-check text-brand-neon text-base"></i>
+    <span id="toastMessage">Pemberitahuan</span>
+  </div>
+</div>
