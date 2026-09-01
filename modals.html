@@ -1,3 +1,180 @@
+<div id="modalBayarIuran" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+  <div class="dashboard-card w-full max-w-md p-6 relative">
+    <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+      <h3 class="text-sm font-bold text-slate-800">Form Bayar Iuran Bulanan</h3>
+      <button onclick="closeModal('modalBayarIuran')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-base"></i></button>
+    </div>
+    <form id="formBayarIuran" onsubmit="event.preventDefault(); handleSaveBayarIuran();" class="space-y-3.5 text-xs">
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">No. Kuitansi (Otomatis &amp; Unik)</label>
+        <input type="text" id="bayarNoKuitansi" readonly class="input-pill w-full bg-slate-100 font-mono font-bold text-brand-indigo cursor-not-allowed">
+      </div>
+
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Nama Warga</label>
+        <input type="text" id="bayarNamaWarga" readonly class="input-pill w-full bg-slate-100 font-bold text-slate-600 cursor-not-allowed">
+      </div>
+
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Jenis Iuran</label>
+        <select id="bayarJenisIuran" onchange="updateDefaultNominalIuran(this.value)" class="input-pill w-full font-medium">
+          <option value="Iuran Kas">Iuran Kas (Kas RT)</option>
+          <option value="Iuran Duka">Iuran Duka (Kas Kematian)</option>
+          <option value="Iuran Sampah">Iuran Sampah</option>
+          <option value="Iuran Sosial">Iuran Sosial</option>
+          <option value="Iuran Lain-lain">Iuran Lain-lain</option>
+        </select>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Periode Bulan</label>
+          <input type="text" id="bayarBulanTahun" required placeholder="September 2026" class="input-pill w-full">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Tanggal Bayar</label>
+          <input type="date" id="bayarTanggal" required class="input-pill w-full">
+        </div>
+      </div>
+
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Nominal Pembayaran (Rp)</label>
+        <input type="number" id="bayarNominal" required placeholder="50000" class="input-pill w-full font-bold">
+      </div>
+
+      <div class="pt-3 flex items-center justify-end gap-2">
+        <button type="button" onclick="closeModal('modalBayarIuran')" class="px-4 py-2.5 rounded-full border border-slate-200 text-slate-600 font-bold">Batal</button>
+        <button type="submit" id="btnSubmitBayarIuran" class="px-5 py-2.5 rounded-full bg-brand-pink text-white font-bold shadow-md hover:opacity-95">Kirim Pembayaran</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="modalPengeluaranRutin" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+  <div class="dashboard-card w-full max-w-md p-6 relative">
+    <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+      <h3 class="text-sm font-bold text-slate-800">Pencatatan Pengeluaran Rutin RT 010</h3>
+      <button onclick="closeModal('modalPengeluaranRutin')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-base"></i></button>
+    </div>
+    <form id="formPengeluaranRutin" onsubmit="event.preventDefault(); handleSavePengeluaranRutin();" class="space-y-3.5 text-xs">
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Tanggal Transaksi</label>
+          <input type="date" id="pengeluaranTanggal" required class="input-pill w-full">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Bulan &amp; Tahun</label>
+          <input type="text" id="pengeluaranBulanTahun" required placeholder="September 2026" class="input-pill w-full">
+        </div>
+      </div>
+
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Sumber Dana Iuran / Pos Pengeluaran</label>
+        <select id="pengeluaranKategori" class="input-pill w-full font-bold text-slate-700">
+          <option value="Iuran Kas">Iuran Kas (Kas RT)</option>
+          <option value="Iuran Duka">Iuran Duka (Kas Kematian)</option>
+          <option value="Iuran Sampah">Iuran Sampah</option>
+          <option value="Iuran Sosial">Iuran Sosial</option>
+          <option value="Iuran Lain-lain">Iuran Lain-lain / Operasional</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Keterangan Pengeluaran</label>
+        <input type="text" id="pengeluaranKeterangan" required placeholder="Contoh: Pembelian alat kebersihan / bantuan duka" class="input-pill w-full">
+      </div>
+
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Nominal (Rp)</label>
+        <input type="number" id="pengeluaranNominal" required placeholder="35000" class="input-pill w-full font-bold">
+      </div>
+
+      <div class="pt-3 flex items-center justify-end gap-2">
+        <button type="button" onclick="closeModal('modalPengeluaranRutin')" class="px-4 py-2.5 rounded-full border border-slate-200 text-slate-600 font-bold">Batal</button>
+        <button type="submit" id="btnSavePengeluaranRutin" class="px-5 py-2.5 rounded-full bg-rose-600 text-white font-bold shadow-md hover:bg-rose-700">Simpan Pengeluaran</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="modalExportPdfLaporan" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+  <div class="dashboard-card w-full max-w-2xl p-6 relative bg-white max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-file-pdf text-rose-600 text-lg"></i>
+        <h3 class="text-sm font-bold text-slate-800">Cetak Laporan Keuangan (Kop Surat Resmi RT 010)</h3>
+      </div>
+      <button onclick="closeModal('modalExportPdfLaporan')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-base"></i></button>
+    </div>
+
+    <div class="space-y-4 text-xs">
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Pilih Filter Jenis Iuran yang Akan Dicetak</label>
+        <select id="pdfFilterJenis" onchange="generatePdfPrintPreview()" class="input-pill w-full text-xs font-bold">
+          <option value="SEMUA">Semua Iuran (Kas, Duka, Sampah, Sosial)</option>
+          <option value="Iuran Kas">Prioritas: Iuran Kas (Kas RT)</option>
+          <option value="Iuran Duka">Prioritas: Iuran Duka (Kas Kematian)</option>
+          <option value="Iuran Sosial">Prioritas: Iuran Sosial</option>
+          <option value="Iuran Sampah">Iuran Sampah</option>
+        </select>
+      </div>
+
+      <!-- KOP SURAT PRINT PREVIEW -->
+      <div id="pdfPrintableArea" class="p-6 bg-white border border-slate-300 rounded-xl shadow-inner font-sans text-slate-800">
+        <div class="text-center pb-3 border-b-2 border-slate-800 mb-4">
+          <h2 class="text-base font-black tracking-widest uppercase text-slate-900">PENGURUS RT 010 RW 05</h2>
+          <p class="text-[11px] font-semibold text-slate-700">Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim Perdana Kusuma</p>
+          <p class="text-[9px] text-slate-500 uppercase tracking-wider mt-0.5">Kelurahan Halim Perdana Kusuma - Kecamatan Makasar - Jakarta Timur</p>
+        </div>
+
+        <div class="text-center mb-4">
+          <h3 class="text-xs font-bold uppercase underline tracking-wide">LAPORAN REKAPITULASI IURAN WARGA</h3>
+          <p class="text-[10px] text-slate-500" id="pdfReportPeriodeLabel">Periode: September 2026</p>
+        </div>
+
+        <table class="w-full text-left text-[11px] border-collapse border border-slate-300 mb-4">
+          <thead>
+            <tr class="bg-slate-100 text-slate-800 font-bold uppercase text-[9px] border-b border-slate-300">
+              <th class="p-2 border border-slate-300">No. Kuitansi</th>
+              <th class="p-2 border border-slate-300">Nama Warga</th>
+              <th class="p-2 border border-slate-300">Jenis Iuran</th>
+              <th class="p-2 border border-slate-300">Periode</th>
+              <th class="p-2 border border-slate-300 text-right">Nominal</th>
+              <th class="p-2 border border-slate-300 text-center">Tgl Bayar</th>
+            </tr>
+          </thead>
+          <tbody id="pdfReportTbody"></tbody>
+          <tfoot>
+            <tr class="bg-slate-50 font-bold border-t-2 border-slate-800">
+              <td colspan="4" class="p-2 text-right uppercase border border-slate-300 text-[10px]">Total Penerimaan:</td>
+              <td class="p-2 text-right text-emerald-700 font-black border border-slate-300" id="pdfReportTotal">Rp 0</td>
+              <td class="p-2 border border-slate-300"></td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <div class="pt-6 flex justify-between text-[10px] text-slate-700">
+          <div class="text-center">
+            <p>Mengetahui,</p>
+            <p class="font-bold mt-10">Ketua RT 010</p>
+          </div>
+          <div class="text-center">
+            <p>Jakarta, <span id="pdfPrintDate">01 September 2026</span></p>
+            <p class="font-bold mt-10">Bendahara RT 010</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="pt-2 flex items-center justify-end gap-2">
+        <button type="button" onclick="closeModal('modalExportPdfLaporan')" class="px-4 py-2 rounded-full border border-slate-200 text-slate-600 font-bold">Tutup</button>
+        <button type="button" onclick="triggerPrintPdf()" class="px-5 py-2 rounded-full bg-red-600 text-white font-bold shadow-md hover:bg-red-700 transition flex items-center gap-1.5">
+          <i class="fa-solid fa-print"></i> Cetak / Simpan PDF
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="modalAnggota" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
   <div class="dashboard-card w-full max-w-md p-6 relative">
     <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
@@ -6,17 +183,14 @@
     </div>
     <form id="formAnggota" onsubmit="event.preventDefault(); handleSaveAnggota();" class="space-y-3 text-xs">
       <input type="hidden" id="formAnggotaId" value="">
-      
       <div>
         <label class="block font-semibold text-slate-700 mb-1">Nomor Kartu Keluarga (KK)</label>
-        <input type="text" id="formAnggotaKk" readonly placeholder="No. KK" class="input-pill w-full bg-slate-100 font-bold text-slate-500 cursor-not-allowed">
+        <input type="text" id="formAnggotaKk" readonly class="input-pill w-full bg-slate-100 font-bold text-slate-500 cursor-not-allowed">
       </div>
-
       <div>
         <label class="block font-semibold text-slate-700 mb-1">Nama Anggota Keluarga</label>
         <input type="text" id="formAnggotaNama" required placeholder="Contoh: Siti Aisyah" class="input-pill w-full">
       </div>
-
       <div>
         <label class="block font-semibold text-slate-700 mb-1">Hubungan Keluarga</label>
         <select id="formAnggotaHubungan" class="input-pill w-full">
@@ -33,7 +207,6 @@
           <option value="Saudara">Saudara Serumah</option>
         </select>
       </div>
-
       <div class="grid grid-cols-2 gap-2">
         <div>
           <label class="block font-semibold text-slate-700 mb-1">Tanggal Lahir</label>
@@ -45,7 +218,6 @@
           <input type="hidden" id="formAnggotaUmurVal" value="0">
         </div>
       </div>
-
       <div>
         <label class="block font-semibold text-slate-700 mb-1">Jenis Kelamin</label>
         <select id="formAnggotaGender" class="input-pill w-full">
@@ -53,45 +225,9 @@
           <option value="Laki-laki">Laki-laki</option>
         </select>
       </div>
-
       <div class="pt-3 flex items-center justify-end gap-2">
         <button type="button" onclick="closeModal('modalAnggota')" class="px-4 py-2.5 rounded-full border border-slate-200 text-slate-600 font-bold">Batal</button>
         <button type="submit" id="btnSaveAnggota" class="px-5 py-2.5 rounded-full bg-brand-pink text-white font-bold shadow-md hover:opacity-95">Simpan Data</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- MODAL: GENERATE TAGIHAN (Dengan Opsi Iuran RT & Iuran Duka) -->
-<div id="modalGenerateIuran" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-  <div class="dashboard-card w-full max-w-md p-6 relative">
-    <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
-      <h3 class="text-sm font-bold text-slate-800">Terbitkan Tagihan Iuran Massal</h3>
-      <button onclick="closeModal('modalGenerateIuran')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-base"></i></button>
-    </div>
-    <form id="formGenerateIuran" onsubmit="event.preventDefault(); handleGenerateIuranMassal();" class="space-y-3.5 text-xs">
-      <div>
-        <label class="block font-semibold text-slate-700 mb-1">Periode Bulan &amp; Tahun</label>
-        <input type="text" id="genBulanTahun" required placeholder="Contoh: September 2026" class="input-pill w-full">
-      </div>
-      <div>
-        <label class="block font-semibold text-slate-700 mb-1">Jenis Iuran</label>
-        <!-- REVISI DROPDOWN: Tambahkan Iuran RT & Iuran Duka -->
-        <select id="genJenisIuran" class="input-pill w-full">
-          <option value="Iuran RT">Iuran RT (Kas RT)</option>
-          <option value="Iuran Duka">Iuran Duka (Kas Kematian)</option>
-          <option value="Iuran Sampah">Iuran Sampah</option>
-          <option value="Iuran Sosial">Iuran Sosial</option>
-          <option value="Iuran Lain-lain">Iuran Lain-lain / Keamanan</option>
-        </select>
-      </div>
-      <div>
-        <label class="block font-semibold text-slate-700 mb-1">Nominal per KK (Rp)</label>
-        <input type="number" id="genNominal" required placeholder="25000" class="input-pill w-full font-bold">
-      </div>
-      <div class="pt-3 flex items-center justify-end gap-2">
-        <button type="button" onclick="closeModal('modalGenerateIuran')" class="px-4 py-2.5 rounded-full border border-slate-200 text-slate-600 font-bold">Batal</button>
-        <button type="submit" id="btnSubmitGenerate" class="px-5 py-2.5 rounded-full bg-brand-amber text-white font-bold shadow-md hover:opacity-95">Terbitkan Sekarang</button>
       </div>
     </form>
   </div>
@@ -107,7 +243,7 @@
       <input type="hidden" id="formMadingId" value="">
       <div>
         <label class="block font-semibold text-slate-700 mb-1">Judul Pengumuman</label>
-        <input type="text" id="formMadingJudul" required placeholder="Contoh: Kerja Bakti Massal RT 05" class="input-pill w-full">
+        <input type="text" id="formMadingJudul" required placeholder="Contoh: Rapat Pleno Warga RT 010" class="input-pill w-full">
       </div>
       <div>
         <label class="block font-semibold text-slate-700 mb-1">Tanggal Kegiatan</label>
@@ -145,11 +281,11 @@
     <div class="space-y-4 text-xs">
       <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-[11px] leading-relaxed">
         <i class="fa-solid fa-circle-info mr-1 text-amber-600"></i>
-        <strong>Petunjuk Import:</strong> Pastikan format header kolom CSV sesuai. Jika ditemukan nomor KK atau NIK yang sudah terdaftar di database, data tersebut akan dilewati dan dilaporkan.
+        <strong>Petunjuk Import:</strong> Pastikan format header kolom CSV sesuai. Data duplikat KK/NIK akan dilaporkan.
       </div>
 
       <div class="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-xl">
-        <span class="font-medium text-slate-700 text-[11px]">Belum memiliki format? Download template CSV:</span>
+        <span class="font-medium text-slate-700 text-[11px]">Download template CSV:</span>
         <button onclick="downloadWargaTemplateCSV()" class="px-3 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-[11px] transition">
           <i class="fa-solid fa-download mr-1"></i>Template CSV
         </button>
