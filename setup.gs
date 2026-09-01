@@ -1,6 +1,6 @@
 /**
  * ====================================================================
- * WARGAKOE - DATABASE SETUP & SAFE MIGRATION
+ * WARGAKOE - DATABASE SETUP & SAFE MIGRATION WITH DATA REPAIR
  * By Zettbos System (ZettBOT 3.1)
  * ====================================================================
  */
@@ -44,6 +44,7 @@ var DB_SCHEMA = {
     name: 'IURAN',
     headers: [
       'ID_Iuran',
+      'No_Kuitansi',
       'No_KK',
       'Nama_Warga',
       'Bulan_Tahun',
@@ -103,9 +104,11 @@ function setupDatabase() {
       }
     }
 
+    // Perbaikan otomatis & pembersihan legacy data KWI-IUR-
+    repairIuranSheet_(ss);
     seedInitialData_(ss);
     SpreadsheetApp.flush();
-    return { success: true, message: 'Database Wargakoe berhasil diinisialisasi.', details: results };
+    return { success: true, message: 'Database Wargakoe berhasil diperbaiki & diinisialisasi.', details: results };
   } catch (error) {
     return { success: false, message: 'Gagal setup database: ' + error.toString() };
   }
@@ -152,8 +155,93 @@ function migrateHeaders_(sheet, expectedHeaders) {
   }
 }
 
+function repairIuranSheet_(ss) {
+  try {
+    var sheet = ss.getSheetByName('IURAN');
+    if (!sheet) return;
+
+    var canonicalHeaders = DB_SCHEMA.IURAN.headers;
+    var lastRow = sheet.getLastRow();
+    var lastCol = sheet.getLastColumn();
+
+    if (lastRow <= 1) {
+      setupHeaders_(sheet, canonicalHeaders);
+      return;
+    }
+
+    var fullData = sheet.getRange(1, 1, lastRow, Math.max(lastCol, canonicalHeaders.length)).getDisplayValues();
+    var currentHeaders = fullData[0];
+
+    var repairedRows = [canonicalHeaders];
+
+    for (var i = 1; i < fullData.length; i++) {
+      var row = fullData[i];
+      var idIuran = row[0] || '';
+      var colB = row[1] || '';
+
+      // Hapus & lewati total data legacy yang memiliki nomor KWI-IUR-
+      if (idIuran.indexOf('KWI-IUR-') === 0 || colB.indexOf('KWI-IUR-') === 0) {
+        continue;
+      }
+
+      if (!idIuran || idIuran.trim() === '') continue;
+
+      var noKwi = '', noKk = '', nama = '', bulan = '', jenis = '', nominal = '', status = '', tglBayar = '', approvedBy = '', createdAt = '';
+
+      var colK = row[10] || '';
+
+      if (colB.length >= 15 && !isNaN(colB) && !colB.startsWith('2025') && !colB.startsWith('2026') && !colB.startsWith('2027')) {
+        noKk = colB;
+        nama = row[2] || '';
+        bulan = row[3] || '';
+        jenis = row[4] || '';
+        nominal = row[5] || '';
+        status = row[6] || '';
+        tglBayar = row[7] || '';
+        approvedBy = row[8] || '';
+        createdAt = row[9] || '';
+        noKwi = colK || ('KWI-' + idIuran);
+      } else {
+        noKwi = colB || row[currentHeaders.indexOf('No_Kuitansi')] || '';
+        noKk = row[2] || row[currentHeaders.indexOf('No_KK')] || '';
+        nama = row[3] || row[currentHeaders.indexOf('Nama_Warga')] || '';
+        bulan = row[4] || row[currentHeaders.indexOf('Bulan_Tahun')] || '';
+        jenis = row[5] || row[currentHeaders.indexOf('Jenis_Iuran')] || '';
+        nominal = row[6] || row[currentHeaders.indexOf('Nominal')] || '';
+        status = row[7] || row[currentHeaders.indexOf('Status_Bayar')] || '';
+        tglBayar = row[8] || row[currentHeaders.indexOf('Tanggal_Bayar')] || '';
+        approvedBy = row[9] || row[currentHeaders.indexOf('Approved_By')] || '';
+        createdAt = row[10] || row[currentHeaders.indexOf('Created_At')] || '';
+      }
+
+      // Normalisasi status
+      status = status.trim();
+      if (status === 'Menunggu Approval' || status === 'Menunggu' || status === 'Pending') {
+        status = 'Menunggu';
+      } else if (status === 'Lunas' || status === 'Sudah bayar' || status === 'Sudah Bayar') {
+        status = 'Sudah bayar';
+      } else if (status === 'Ditolak') {
+        status = 'Ditolak';
+      } else if (!status || isNaN(status) === false) {
+        status = 'Menunggu';
+      }
+
+      repairedRows.push([
+        idIuran, noKwi, noKk, nama, bulan, jenis, nominal, status, tglBayar, approvedBy, createdAt
+      ]);
+    }
+
+    sheet.clearContents();
+    sheet.getRange(1, 1, repairedRows.length, canonicalHeaders.length).setValues(repairedRows);
+    setupHeaders_(sheet, canonicalHeaders);
+  } catch (err) {
+    Logger.log('Gagal repair IURAN: ' + err.toString());
+  }
+}
+
 function seedInitialData_(ss) {
   var nowStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
+  var todayKwi = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyyMMdd');
   
   var userSheet = ss.getSheetByName(DB_SCHEMA.USERS.name);
   if (userSheet && userSheet.getLastRow() <= 1) {
@@ -161,73 +249,50 @@ function seedInitialData_(ss) {
       [
         '3171010000000001', '3171010101850001', 'Budi Santoso', '081234567890',
         'admin123', 'Super Admin', 'Pengurus RT', '15/01/1985', '39',
-        'Kamp. Baru I Jl. Marga Mulya No. 01 RT 05/RW 02', 'Laki-laki', 'Suami', 'Pribadi',
+        'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim Perdana Kusuma', 'Laki-laki', 'Suami', 'Pribadi',
         'Sarjana', 'Pegawai Negeri', nowStr
       ],
       [
         '3171010000000002', '3171010102900002', 'Siti Rahmawati', '081234567891',
         'bendahara123', 'Bendahara', 'Pengurus RT', '20/05/1990', '34',
-        'Kamp. Baru I Jl. Marga Mulya No. 04 RT 05/RW 02', 'Perempuan', 'Istri', 'Pribadi',
+        'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim Perdana Kusuma', 'Perempuan', 'Istri', 'Pribadi',
         'Sarjana', 'Wiraswasta', nowStr
       ],
       [
         '3171010000000003', '3171010103950003', 'Agus Setiawan', '081234567892',
         'warga123', 'Warga', 'Warga', '10/08/1995', '29',
-        'Jl. Anggrek No. 12 RT 05/RW 02', 'Laki-laki', 'Suami', 'Kontrak',
+        'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim Perdana Kusuma', 'Laki-laki', 'Suami', 'Kontrak',
         'Diploma', 'Pegawai Swasta', nowStr
       ],
       [
         '3171010000000004', '3171010104600004', 'Haji Abdullah', '081234567893',
         'warga123', 'Warga', 'Warga', '05/03/1960', '64',
-        'Kamp. Baru I Jl. Marga Mulya No. 08 RT 05/RW 02', 'Laki-laki', 'Ayah', 'Pribadi',
+        'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim Perdana Kusuma', 'Laki-laki', 'Ayah', 'Pribadi',
         'SMA', 'Wiraswasta', nowStr
       ]
     ];
     userSheet.getRange(2, 1, dummyUsers.length, dummyUsers[0].length).setValues(dummyUsers);
   }
 
-  var agtSheet = ss.getSheetByName(DB_SCHEMA.ANGGOTA_KELUARGA.name);
-  if (agtSheet && agtSheet.getLastRow() <= 1) {
-    var dummyAnggota = [
-      ['AGT-0001', '3171010000000001', 'Dewi Lestari', 'Istri', '12/04/1988', '36', 'Perempuan', nowStr],
-      ['AGT-0002', '3171010000000001', 'Rian Santoso', 'Anak ke-1', '08/09/2012', '12', 'Laki-laki', nowStr],
-      ['AGT-0003', '3171010000000001', 'Balita Alika', 'Anak ke-2', '15/02/2023', '1', 'Perempuan', nowStr],
-      ['AGT-0004', '3171010000000003', 'Nina Marlina', 'Istri', '22/11/1997', '27', 'Perempuan', nowStr],
-      ['AGT-0005', '3171010000000003', 'Rizky Pratama', 'Anak ke-1', '14/06/2021', '3', 'Laki-laki', nowStr]
-    ];
-    agtSheet.getRange(2, 1, dummyAnggota.length, dummyAnggota[0].length).setValues(dummyAnggota);
-  }
-
   var iurSheet = ss.getSheetByName(DB_SCHEMA.IURAN.name);
   if (iurSheet && iurSheet.getLastRow() <= 1) {
     var currentBulan = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'MMMM yyyy');
     var dummyIuran = [
-      ['IUR-0001', '3171010000000001', 'Budi Santoso', currentBulan, 'Iuran RT', '25000', 'Lunas', nowStr, 'Siti Rahmawati', nowStr],
-      ['IUR-0002', '3171010000000001', 'Budi Santoso', currentBulan, 'Iuran Duka', '15000', 'Lunas', nowStr, 'Siti Rahmawati', nowStr],
-      ['IUR-0003', '3171010000000003', 'Agus Setiawan', currentBulan, 'Iuran Sampah', '25000', 'Menunggu Approval', nowStr, '-', nowStr],
-      ['IUR-0004', '3171010000000003', 'Agus Setiawan', currentBulan, 'Iuran Sosial', '15000', 'Belum Bayar', '-', '-', nowStr],
-      ['IUR-0005', '3171010000000004', 'Haji Abdullah', currentBulan, 'Iuran Lain-lain', '50000', 'Lunas', nowStr, 'Siti Rahmawati', nowStr]
+      ['IUR-0001', todayKwi + '01', '3171010000000001', 'Budi Santoso', currentBulan, 'Iuran Kas', '50000', 'Sudah bayar', nowStr, 'Siti Rahmawati', nowStr],
+      ['IUR-0002', todayKwi + '02', '3171010000000001', 'Budi Santoso', currentBulan, 'Iuran Duka', '20000', 'Sudah bayar', nowStr, 'Siti Rahmawati', nowStr],
+      ['IUR-0003', todayKwi + '03', '3171010000000003', 'Agus Setiawan', currentBulan, 'Iuran Sampah', '25000', 'Menunggu', nowStr, '-', nowStr],
+      ['IUR-0004', todayKwi + '04', '3171010000000003', 'Agus Setiawan', currentBulan, 'Iuran Sosial', '15000', 'Belum Bayar', '-', '-', nowStr],
+      ['IUR-0005', todayKwi + '05', '3171010000000004', 'Haji Abdullah', currentBulan, 'Iuran Kas', '50000', 'Sudah bayar', nowStr, 'Siti Rahmawati', nowStr]
     ];
     iurSheet.getRange(2, 1, dummyIuran.length, dummyIuran[0].length).setValues(dummyIuran);
-  }
-
-  var madingSheet = ss.getSheetByName(DB_SCHEMA.MADING.name);
-  if (madingSheet && madingSheet.getLastRow() <= 1) {
-    var dummyMading = [
-      ['MAD-0001', 'Kerja Bakti Bulanan RT 05', '10 September 2026', 'Diharapkan seluruh warga hadir membawa alat kebersihan masing-masing di pos ronda utama pukul 07:00 WIB.', 'Published', 'Budi Santoso (Ketua RT)', nowStr],
-      ['MAD-0002', 'Rapat Pleno Warga & Pembahasan Kas', '25 September 2026', 'Pertemuan rutin bulanan bertempat di balai warga lantai 1 pukul 19:30 WIB.', 'Published', 'Siti Rahmawati (Bendahara)', nowStr]
-    ];
-    madingSheet.getRange(2, 1, dummyMading.length, dummyMading[0].length).setValues(dummyMading);
   }
 
   var kasSheet = ss.getSheetByName(DB_SCHEMA.KAS_RT.name);
   if (kasSheet && kasSheet.getLastRow() <= 1) {
     var curBulanYear = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'MMMM yyyy');
     var dummyKas = [
-      ['KAS-0001', '01/08/2026', 'Pemasukan', 'Iuran RT', 'Penerimaan Iuran Bulanan Warga RT 05', '1250000', curBulanYear, nowStr],
-      ['KAS-0002', '03/08/2026', 'Pemasukan', 'Donasi', 'Sumbangan Donatur Kegiatan RT', '500000', curBulanYear, nowStr],
-      ['KAS-0003', '05/08/2026', 'Pengeluaran', 'Kebersihan', 'Pembelian Alat Kebersihan & Sapu Pos Ronda', '150000', curBulanYear, nowStr],
-      ['KAS-0004', '12/08/2026', 'Pengeluaran', 'Fasilitas', 'Perbaikan Lampu Jalan Gang Utama RT 05', '200000', curBulanYear, nowStr]
+      ['KAS-0001', '01/09/2026', 'Pemasukan', 'Iuran Kas', 'Penerimaan Iuran Kas Bulanan RT 010', '100000', curBulanYear, nowStr],
+      ['KAS-0002', '03/09/2026', 'Pengeluaran', 'Iuran Kas', 'Pembelian Alat Kebersihan Pos Ronda RT 010', '35000', curBulanYear, nowStr]
     ];
     kasSheet.getRange(2, 1, dummyKas.length, dummyKas[0].length).setValues(dummyKas);
   }
