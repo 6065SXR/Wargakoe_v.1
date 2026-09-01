@@ -26,10 +26,6 @@
     var curLbl = document.getElementById('currentMonthYearLabel');
     if (curLbl) curLbl.innerText = monthYearStr;
 
-    var genLbl = document.getElementById('genBulanTahun');
-    if (genLbl) genLbl.value = monthYearStr;
-
-    // Set default filter bulan dan tahun untuk Detail Kas RT
     var kMonth = document.getElementById('kasRtFilterBulan');
     if (kMonth) kMonth.value = currentMonthStr;
     var kYear = document.getElementById('kasRtFilterTahun');
@@ -38,7 +34,7 @@
 
   function checkInitialAuth() {
     if (typeof google === 'undefined' || !google.script || !google.script.run) {
-      showToast('Info: Menjalankan dalam mode Safe Preview Canvas.', 'info');
+      showToast('Mode Canvas Demo', 'info');
       currentUser = {
         noKk: '3171010000000001',
         noKtp: '3171010101850001',
@@ -46,7 +42,7 @@
         noHp: '081234567890',
         role: 'Super Admin',
         statusUser: 'Pengurus RT',
-        alamat: 'Kamp. Baru I Jl. Marga Mulya No. 01 RT 05/RW 02'
+        alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim Perdana Kusuma'
       };
       showMainDashboard();
       return;
@@ -123,7 +119,7 @@
           nama: 'Budi Santoso',
           role: 'Super Admin',
           statusUser: 'Pengurus RT',
-          alamat: 'Kamp. Baru I Jl. Marga Mulya No. 01'
+          alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim'
         };
         showToast('Login Demo Berhasil', 'success');
         showMainDashboard();
@@ -198,11 +194,12 @@
 
       var isPengurus = (currentUser.role === 'Super Admin' || currentUser.statusUser === 'Pengurus RT' || currentUser.role === 'Pengurus RT' || currentUser.role === 'Ketua RT' || currentUser.role === 'Bendahara' || currentUser.role === 'Sekretaris');
 
-      if (currentUser.role === 'Warga' && !isPengurus) {
-        var btnGen = document.getElementById('pengurusIuranActions');
-        if (btnGen) btnGen.classList.add('hidden');
+      var btnPengeluaranContainer = document.getElementById('btnPengeluaranRutinContainer');
+      if (btnPengeluaranContainer) {
+        if (isPengurus) btnPengeluaranContainer.classList.remove('hidden');
+        else btnPengeluaranContainer.classList.add('hidden');
       }
-      
+
       var madingAction = document.getElementById('madingActionContainer');
       if (madingAction) {
         if (!isPengurus) madingAction.classList.add('hidden');
@@ -275,6 +272,7 @@
         renderDashboardStats({
           totalWarga: 24,
           totalKk: 8,
+          kasTerkumpul: 1000000,
           totalTerkumpul: 1250000,
           totalMenunggu: 50000,
           balita: 3,
@@ -285,10 +283,11 @@
           kasKematianBulanIni: 100000,
           iuranSampahBulanIni: 350000,
           iuranSosialBulanIni: 200000,
-          iuranLainBulanIni: 200000,
-          tagihanSaya: [],
+          unpaidDuesList: [
+            { jenisIuran: 'Iuran Sampah', nominal: 25000, bulanTahun: 'September 2026', statusBayar: 'Belum Bayar' }
+          ],
           madingTerbaru: [
-            { judul: 'Kerja Bakti Massal RT 05', tanggalKegiatan: '10 September 2026', note: 'Harap hadir membawa alat kebersihan.', pembuat: 'Budi Santoso' }
+            { judul: 'Kerja Bakti Bulanan RT 010', tanggalKegiatan: '10 September 2026', note: 'Harap hadir membawa alat kebersihan.', pembuat: 'Budi Santoso' }
           ]
         });
       }, 400);
@@ -302,7 +301,8 @@
 
     document.getElementById('statTotalWarga').innerText = (stats.totalWarga || 0) + ' Jiwa';
     document.getElementById('statTotalKk').innerText = (stats.totalKk || 0) + ' KK';
-    document.getElementById('statTotalTerkumpul').innerText = formatRupiah(stats.totalTerkumpul || 0);
+    
+    document.getElementById('statKasTerkumpul').innerText = formatRupiah(stats.kasTerkumpul || 0);
     document.getElementById('statMenungguApproval').innerText = formatRupiah(stats.totalMenunggu || 0);
 
     var elKasRt = document.getElementById('sumKasRt');
@@ -313,7 +313,6 @@
 
     document.getElementById('sumIuranSampah').innerText = formatRupiah(stats.iuranSampahBulanIni || 0);
     document.getElementById('sumIuranSosial').innerText = formatRupiah(stats.iuranSosialBulanIni || 0);
-    document.getElementById('sumIuranLain').innerText = formatRupiah(stats.iuranLainBulanIni || 0);
 
     var total = Math.max(1, stats.totalWarga || 1);
     var bPct = Math.round(((stats.balita || 0) / total) * 100);
@@ -331,11 +330,14 @@
     document.getElementById('demoLansiaBar').style.width = lPct + '%';
 
     var pBanner = document.getElementById('wargaPendingBanner');
-    if (stats.tagihanSaya && stats.tagihanSaya.length > 0) {
-      pBanner.classList.remove('hidden');
-      document.getElementById('wargaPendingCountText').innerText = 'Anda memiliki ' + stats.tagihanSaya.length + ' tagihan iuran belum lunas.';
-    } else {
-      pBanner.classList.add('hidden');
+    if (pBanner) {
+      var isSuperAdmin = currentUser && currentUser.role === 'Super Admin';
+      if (!isSuperAdmin && stats.unpaidDuesList && stats.unpaidDuesList.length > 0) {
+        pBanner.classList.remove('hidden');
+        document.getElementById('wargaPendingCountText').innerText = 'Anda memiliki ' + stats.unpaidDuesList.length + ' tagihan iuran bulanan yang belum diselesaikan / menunggu verifikasi.';
+      } else {
+        pBanner.classList.add('hidden');
+      }
     }
 
     var dashMading = document.getElementById('dashboardMadingList');
@@ -380,14 +382,12 @@
       setTimeout(function() {
         renderKasRtTable({
           data: [
-            { tanggal: '01/08/2026', jenisKas: 'Pemasukan', kategori: 'Iuran RT', keterangan: 'Penerimaan Iuran Bulanan Warga RT 05', nominal: 1250000 },
-            { tanggal: '03/08/2026', jenisKas: 'Pemasukan', kategori: 'Donasi', keterangan: 'Sumbangan Donatur Kegiatan RT', nominal: 500000 },
-            { tanggal: '05/08/2026', jenisKas: 'Pengeluaran', kategori: 'Kebersihan', keterangan: 'Pembelian Alat Kebersihan Pos Ronda', nominal: 150000 },
-            { tanggal: '12/08/2026', jenisKas: 'Pengeluaran', kategori: 'Fasilitas', keterangan: 'Perbaikan Lampu Jalan Gang Utama', nominal: 200000 }
+            { idKas: 'KAS-0001', tanggal: '01/09/2026', jenisKas: 'Pemasukan', kategori: 'Iuran Kas', keterangan: 'Penerimaan Iuran Kas Bulanan RT 010', nominal: 100000, bulanTahun: bulanTahun },
+            { idKas: 'KAS-0002', tanggal: '03/09/2026', jenisKas: 'Pengeluaran', kategori: 'Iuran Kas', keterangan: 'Pembelian Sapu &amp; Alat Kebersihan Pos Ronda', nominal: 35000, bulanTahun: bulanTahun }
           ],
-          totalPemasukan: 1750000,
-          totalPengeluaran: 350000,
-          sisaSaldo: 1400000
+          totalPemasukan: 100000,
+          totalPengeluaran: 35000,
+          sisaSaldo: 65000
         });
       }, 300);
     }
@@ -428,6 +428,320 @@
     }
   }
 
+  function openModalBayarIuran() {
+    document.getElementById('bayarNamaWarga').value = currentUser ? currentUser.nama : 'Warga RT 010';
+    var dateNow = new Date();
+    var months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    document.getElementById('bayarBulanTahun').value = months[dateNow.getMonth()] + ' ' + dateNow.getFullYear();
+    
+    var dayStr = ('0' + dateNow.getDate()).slice(-2);
+    var monthStr = ('0' + (dateNow.getMonth() + 1)).slice(-2);
+    document.getElementById('bayarTanggal').value = dateNow.getFullYear() + '-' + monthStr + '-' + dayStr;
+
+    document.getElementById('bayarJenisIuran').value = 'Iuran Kas';
+    document.getElementById('bayarNominal').value = '50000';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(function(res) {
+        if (res && res.success) {
+          document.getElementById('bayarNoKuitansi').value = res.noKuitansi;
+          document.getElementById('modalBayarIuran').classList.remove('hidden');
+        }
+      }).getNextKuitansiNo();
+    } else {
+      var yyyymmdd = dateNow.getFullYear() + monthStr + dayStr;
+      document.getElementById('bayarNoKuitansi').value = yyyymmdd + '01';
+      document.getElementById('modalBayarIuran').classList.remove('hidden');
+    }
+  }
+
+  function updateDefaultNominalIuran(jenis) {
+    var nomInput = document.getElementById('bayarNominal');
+    if (jenis === 'Iuran Kas') nomInput.value = '50000';
+    else if (jenis === 'Iuran Duka') nomInput.value = '20000';
+    else if (jenis === 'Iuran Sampah') nomInput.value = '25000';
+    else if (jenis === 'Iuran Sosial') nomInput.value = '15000';
+    else nomInput.value = '50000';
+  }
+
+  function handleSaveBayarIuran() {
+    var payload = {
+      noKuitansi: document.getElementById('bayarNoKuitansi').value,
+      noKk: currentUser ? currentUser.noKk : '',
+      namaWarga: document.getElementById('bayarNamaWarga').value,
+      jenisIuran: document.getElementById('bayarJenisIuran').value,
+      bulanTahun: document.getElementById('bayarBulanTahun').value,
+      tanggalBayar: document.getElementById('bayarTanggal').value,
+      nominal: document.getElementById('bayarNominal').value
+    };
+
+    var btn = document.getElementById('btnSubmitBayarIuran');
+    btn.disabled = true;
+    btn.innerText = 'Mengirim...';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(function(res) {
+        btn.disabled = false;
+        btn.innerText = 'Kirim Pembayaran';
+        closeModal('modalBayarIuran');
+        if (res && res.success) {
+          showToast(res.message, 'success');
+          fetchIuranData(0);
+          refreshData();
+        } else {
+          showToast(res ? res.message : 'Gagal.', 'error');
+        }
+      }).submitBayarIuran(payload);
+    } else {
+      setTimeout(function() {
+        btn.disabled = false;
+        btn.innerText = 'Kirim Pembayaran';
+        closeModal('modalBayarIuran');
+        showToast('Pembayaran berhasil dikirim! Status: Menunggu', 'success');
+        fetchIuranData(0);
+        refreshData();
+      }, 400);
+    }
+  }
+
+  function openModalPengeluaranRutin() {
+    var dateNow = new Date();
+    var dayStr = ('0' + dateNow.getDate()).slice(-2);
+    var monthStr = ('0' + (dateNow.getMonth() + 1)).slice(-2);
+    var months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+    document.getElementById('pengeluaranTanggal').value = dateNow.getFullYear() + '-' + monthStr + '-' + dayStr;
+    document.getElementById('pengeluaranBulanTahun').value = months[dateNow.getMonth()] + ' ' + dateNow.getFullYear();
+    document.getElementById('pengeluaranKategori').value = 'Iuran Kas';
+    document.getElementById('pengeluaranKeterangan').value = '';
+    document.getElementById('pengeluaranNominal').value = '';
+
+    document.getElementById('modalPengeluaranRutin').classList.remove('hidden');
+  }
+
+  function handleSavePengeluaranRutin() {
+    var payload = {
+      tanggal: document.getElementById('pengeluaranTanggal').value,
+      bulanTahun: document.getElementById('pengeluaranBulanTahun').value,
+      kategori: document.getElementById('pengeluaranKategori').value,
+      keterangan: document.getElementById('pengeluaranKeterangan').value,
+      nominal: document.getElementById('pengeluaranNominal').value
+    };
+
+    var btn = document.getElementById('btnSavePengeluaranRutin');
+    btn.disabled = true;
+    btn.innerText = 'Menyimpan...';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(function(res) {
+        btn.disabled = false;
+        btn.innerText = 'Simpan Pengeluaran';
+        closeModal('modalPengeluaranRutin');
+        if (res && res.success) {
+          showToast(res.message, 'success');
+          fetchKasRtDetails();
+          refreshData();
+        } else {
+          showToast(res ? res.message : 'Gagal.', 'error');
+        }
+      }).savePengeluaranRutin(payload);
+    } else {
+      setTimeout(function() {
+        btn.disabled = false;
+        btn.innerText = 'Simpan Pengeluaran';
+        closeModal('modalPengeluaranRutin');
+        showToast('Pengeluaran rutin dicatat! (Demo)', 'success');
+        fetchKasRtDetails();
+      }, 400);
+    }
+  }
+
+  function debounceFetchIuran() {
+    clearTimeout(debounceTimerIuran);
+    debounceTimerIuran = setTimeout(function() { fetchIuranData(0); }, 350);
+  }
+
+  function fetchIuranData(offset) {
+    offset = offset || 0;
+    var status = document.getElementById('filterIuranStatus').value;
+    var jenis = document.getElementById('filterIuranJenis').value;
+    var search = document.getElementById('filterIuranSearch').value;
+    var params = {
+      limit: 10,
+      offset: offset,
+      statusBayar: status,
+      jenisIuran: jenis,
+      search: search,
+      role: currentUser ? currentUser.role : 'Warga',
+      noKk: currentUser ? currentUser.noKk : ''
+    };
+
+    var tbody = document.getElementById('iuranTableBody');
+    tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat data iuran...</td></tr>';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(function(res) {
+        if (res && res.success) renderIuranTable(res);
+      }).getIuranList(params);
+    } else {
+      setTimeout(function() {
+        var dummyData = [
+          { idIuran: 'IUR-0001', noKuitansi: '2026090101', namaWarga: 'Budi Santoso', noKk: '3171010000000001', bulanTahun: 'September 2026', jenisIuran: 'Iuran Kas', nominal: '50000', statusBayar: 'Sudah bayar', approvedBy: 'Siti Rahmawati' },
+          { idIuran: 'IUR-0003', noKuitansi: '2026090103', namaWarga: 'Agus Setiawan', noKk: '3171010000000003', bulanTahun: 'September 2026', jenisIuran: 'Iuran Sampah', nominal: '25000', statusBayar: 'Menunggu', approvedBy: '-' }
+        ];
+        if (currentUser && currentUser.role === 'Warga') {
+          dummyData = dummyData.filter(function(x) { return x.noKk === currentUser.noKk; });
+        }
+        renderIuranTable({ data: dummyData, total: dummyData.length, page: 1, totalPages: 1 });
+      }, 300);
+    }
+  }
+
+  function renderIuranTable(res) {
+    var tbody = document.getElementById('iuranTableBody');
+    tbody.innerHTML = '';
+    if (!res.data || res.data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400">Tidak ada data iuran.</td></tr>';
+      document.getElementById('iuranPaginationInfo').innerText = 'Menampilkan 0 data';
+      document.getElementById('iuranPaginationBtns').innerHTML = '';
+      return;
+    }
+
+    var isPengurus = currentUser && (
+      currentUser.role === 'Super Admin' ||
+      currentUser.role === 'Pengurus RT' ||
+      currentUser.role === 'Ketua RT' ||
+      currentUser.role === 'Bendahara' ||
+      currentUser.role === 'Sekretaris' ||
+      currentUser.statusUser === 'Pengurus RT'
+    );
+
+    for (var i = 0; i < res.data.length; i++) {
+      var row = res.data[i];
+      var tr = document.createElement('tr');
+      tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+
+      var st = (row.statusBayar || '').trim();
+      var isMenunggu = (st === 'Menunggu' || st === 'Menunggu Approval');
+
+      var statusBadge = '';
+      if (st === 'Sudah bayar' || st === 'Lunas') {
+        statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800"><i class="fa-solid fa-circle-check mr-1"></i>Sudah bayar</span>';
+      } else if (isMenunggu) {
+        statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 animate-pulse"><i class="fa-solid fa-clock mr-1"></i>Menunggu</span>';
+      } else if (st === 'Ditolak') {
+        statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800"><i class="fa-solid fa-circle-xmark mr-1"></i>Ditolak</span>';
+      } else {
+        statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700"><i class="fa-solid fa-circle-minus mr-1"></i>Belum Bayar</span>';
+      }
+
+      var actionBtns = '-';
+      if (isPengurus && isMenunggu) {
+        actionBtns = '<div class="flex items-center justify-center gap-1.5">' +
+          '<button onclick="handleApproveIuran(\'' + row.idIuran + '\', \'APPROVE\')" class="p-1 px-2.5 rounded-lg bg-emerald-600 text-white font-bold text-[10px] shadow hover:bg-emerald-700 transition flex items-center gap-1"><i class="fa-solid fa-check"></i> Diterima</button>' +
+          '<button onclick="handleApproveIuran(\'' + row.idIuran + '\', \'REJECT\')" class="p-1 px-2 rounded-lg bg-rose-100 text-rose-600 font-bold text-[10px] hover:bg-rose-200 transition flex items-center gap-1"><i class="fa-solid fa-xmark"></i> Ditolak</button>' +
+          '</div>';
+      }
+
+      tr.innerHTML = 
+        '<td class="p-3.5"><p class="font-mono font-bold text-brand-indigo text-[11px]"><i class="fa-solid fa-ticket mr-1"></i>' + (row.noKuitansi || '-') + '</p><p class="font-semibold text-slate-800">' + row.namaWarga + '</p></td>' +
+        '<td class="p-3.5"><p class="font-bold text-slate-700">' + row.jenisIuran + '</p><p class="text-[10px] text-slate-400">' + row.bulanTahun + '</p></td>' +
+        '<td class="p-3.5 font-black text-slate-800">' + formatRupiah(row.nominal) + '</td>' +
+        '<td class="p-3.5">' + statusBadge + '</td>' +
+        '<td class="p-3.5 text-slate-500 text-[11px]">' + (row.approvedBy || '-') + '</td>' +
+        '<td class="p-3.5 text-center">' + actionBtns + '</td>';
+      tbody.appendChild(tr);
+    }
+    document.getElementById('iuranPaginationInfo').innerText = 'Halaman ' + res.page + ' dari ' + res.totalPages;
+    renderPaginationButtons('iuranPaginationBtns', res.page, res.totalPages, 'fetchIuranData');
+  }
+
+  function handleApproveIuran(idIuran, action) {
+    var approver = currentUser ? currentUser.nama : 'Pengurus RT';
+    var actionLabel = action === 'APPROVE' ? 'DITERIMA' : 'DITOLAK';
+    showToast('Memproses verifikasi (' + actionLabel + ')...', 'info');
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(function(res) {
+        if (res && res.success) {
+          showToast(res.message, 'success');
+          fetchIuranData(0);
+          refreshData();
+        } else {
+          showToast(res ? res.message : 'Gagal.', 'error');
+        }
+      }).approveIuran(idIuran, approver, action);
+    } else {
+      setTimeout(function() {
+        showToast('Pembayaran iuran berhasil diverifikasi: ' + actionLabel, 'success');
+        fetchIuranData(0);
+        refreshData();
+      }, 400);
+    }
+  }
+
+  function openModalExportPdfLaporan() {
+    document.getElementById('pdfFilterJenis').value = 'SEMUA';
+    generatePdfPrintPreview();
+    document.getElementById('modalExportPdfLaporan').classList.remove('hidden');
+  }
+
+  function generatePdfPrintPreview() {
+    var jenis = document.getElementById('pdfFilterJenis').value;
+    var tbody = document.getElementById('pdfReportTbody');
+    tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Menyiapkan Laporan Keuangan...</td></tr>';
+
+    var dateNow = new Date();
+    var dayStr = ('0' + dateNow.getDate()).slice(-2);
+    var monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    document.getElementById('pdfPrintDate').innerText = dayStr + ' ' + monthNames[dateNow.getMonth()] + ' ' + dateNow.getFullYear();
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(function(res) {
+        if (res && res.success) renderPdfReportContent(res);
+      }).getLaporanKeuanganData(jenis);
+    } else {
+      setTimeout(function() {
+        renderPdfReportContent({
+          data: [
+            { noKuitansi: '2026090101', namaWarga: 'Budi Santoso', jenisIuran: 'Iuran Kas', bulanTahun: 'September 2026', nominal: 50000, tanggalBayar: '01/09/2026' },
+            { noKuitansi: '2026090102', namaWarga: 'Budi Santoso', jenisIuran: 'Iuran Duka', bulanTahun: 'September 2026', nominal: 20000, tanggalBayar: '01/09/2026' }
+          ],
+          totalNominal: 70000
+        });
+      }, 300);
+    }
+  }
+
+  function renderPdfReportContent(res) {
+    var tbody = document.getElementById('pdfReportTbody');
+    tbody.innerHTML = '';
+    document.getElementById('pdfReportTotal').innerText = formatRupiah(res.totalNominal || 0);
+
+    if (!res.data || res.data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400 border border-slate-300">Belum ada transaksi iuran yang terverifikasi untuk kategori ini.</td></tr>';
+      return;
+    }
+
+    for (var i = 0; i < res.data.length; i++) {
+      var d = res.data[i];
+      var tr = document.createElement('tr');
+      tr.className = 'border-b border-slate-200';
+      tr.innerHTML = 
+        '<td class="p-2 border border-slate-300 font-mono font-bold text-slate-900">' + d.noKuitansi + '</td>' +
+        '<td class="p-2 border border-slate-300 font-semibold text-slate-800">' + d.namaWarga + '</td>' +
+        '<td class="p-2 border border-slate-300 text-slate-700">' + d.jenisIuran + '</td>' +
+        '<td class="p-2 border border-slate-300 text-slate-600">' + d.bulanTahun + '</td>' +
+        '<td class="p-2 border border-slate-300 text-right font-bold text-slate-900">' + formatRupiah(d.nominal) + '</td>' +
+        '<td class="p-2 border border-slate-300 text-center text-slate-500 text-[10px]">' + (d.tanggalBayar || '-') + '</td>';
+      tbody.appendChild(tr);
+    }
+  }
+
+  function triggerPrintPdf() {
+    window.print();
+  }
+
   function debounceFetchWarga() {
     clearTimeout(debounceTimerWarga);
     debounceTimerWarga = setTimeout(function() { fetchWargaData(0); }, 350);
@@ -450,7 +764,7 @@
     } else {
       setTimeout(function() {
         renderWargaTable({
-          data: [{ nama: 'Budi Santoso', noHp: '081234567890', alamat: 'Kamp. Baru I Jl. Marga Mulya No. 01', statusRumah: 'Pribadi', pekerjaan: 'Pegawai Negeri' }],
+          data: [{ noKk: '3171010000000001', noKtp: '3171010101850001', nama: 'Budi Santoso', noHp: '081234567890', alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim', statusRumah: 'Pribadi', pekerjaan: 'Pegawai Negeri', role: 'Super Admin', statusUser: 'Pengurus RT' }],
           total: 1, page: 1, totalPages: 1
         });
       }, 300);
@@ -466,13 +780,14 @@
       document.getElementById('wargaPaginationBtns').innerHTML = '';
       return;
     }
+
     for (var i = 0; i < res.data.length; i++) {
       var w = res.data[i];
       var tr = document.createElement('tr');
       tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
 
       tr.innerHTML = 
-        '<td class="p-3.5 font-bold text-slate-800">' + w.nama + '</td>' +
+        '<td class="p-3.5"><p class="font-bold text-slate-800">' + w.nama + '</p><p class="text-[10px] text-slate-400 font-mono">KK: ' + w.noKk + '</p></td>' +
         '<td class="p-3.5 text-slate-700 font-medium"><i class="fa-solid fa-phone mr-1.5 text-slate-400"></i>' + w.noHp + '</td>' +
         '<td class="p-3.5 text-slate-600">' + (w.alamat || '-') + '</td>' +
         '<td class="p-3.5"><span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">' + w.statusRumah + '</span></td>' +
@@ -484,23 +799,17 @@
   }
 
   function exportWargaCSV() {
-    showToast('Menyiapkan data export...', 'info');
+    showToast('Menyiapkan export...', 'info');
     if (typeof google !== 'undefined' && google.script && google.script.run) {
       google.script.run.withSuccessHandler(function(res) {
         if (res && res.success && res.data) {
-          triggerCSVDownload(res.data, 'Data_Warga_RT05.csv');
-          showToast('Export berhasil diunduh.', 'success');
-        } else {
-          showToast('Gagal memuat data export.', 'error');
+          triggerCSVDownload(res.data, 'Data_Warga_RT010.csv');
+          showToast('Export berhasil.', 'success');
         }
       }).getAllWargaForExport();
     } else {
       setTimeout(function() {
-        var dummyExport = [
-          { noKk: '3171010000000001', noKtp: '3171010101850001', nama: 'Budi Santoso', noHp: '081234567890', role: 'Super Admin', statusUser: 'Pengurus RT', tanggalLahir: '15/01/1985', umur: '39', alamat: 'Kamp. Baru I Jl. Marga Mulya No. 01', jenisKelamin: 'Laki-laki', statusKeluarga: 'Suami', statusRumah: 'Pribadi', pendidikan: 'Sarjana', pekerjaan: 'Pegawai Negeri' }
-        ];
-        triggerCSVDownload(dummyExport, 'Data_Warga_Demo.csv');
-        showToast('Export Demo Berhasil', 'success');
+        triggerCSVDownload([{ noKk: '3171010000000001', nama: 'Budi Santoso', noHp: '081234567890' }], 'Data_Warga_Demo.csv');
       }, 400);
     }
   }
@@ -508,8 +817,7 @@
   function triggerCSVDownload(dataArray, filename) {
     if (!dataArray || dataArray.length === 0) return;
     var headers = Object.keys(dataArray[0]);
-    var csvRows = [];
-    csvRows.push(headers.join(','));
+    var csvRows = [headers.join(',')];
 
     for (var i = 0; i < dataArray.length; i++) {
       var values = [];
@@ -520,22 +828,17 @@
       csvRows.push(values.join(','));
     }
 
-    var csvString = csvRows.join('\n');
-    var blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    var blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
     var link = document.createElement('a');
-    var url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', filename);
-    link.style.visibility = 'hidden';
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   }
 
   function downloadWargaTemplateCSV() {
-    var template = [
-      { No_KK: '3171010000000099', No_KTP: '3171010101850099', Nama: 'Warga Contoh', No_HP: '081299998888', Password: 'warga123', Role: 'Warga', Status_User: 'Warga', Tanggal_Lahir: '10/10/1990', Umur: '34', Alamat: 'Kamp. Baru I Jl. Marga Mulya No. 99', Jenis_Kelamin: 'Laki-laki', Status_Keluarga: 'Suami', Status_Rumah: 'Pribadi', Pendidikan: 'SMA', Pekerjaan: 'Pegawai Swasta' }
-    ];
+    var template = [{ No_KK: '3171010000000099', No_KTP: '3171010101850099', Nama: 'Warga Contoh', No_HP: '081299998888', Password: 'warga123', Role: 'Warga', Status_User: 'Warga', Tanggal_Lahir: '10/10/1990', Umur: '34', Alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim', Jenis_Kelamin: 'Laki-laki', Status_Keluarga: 'Suami', Status_Rumah: 'Pribadi', Pendidikan: 'SMA', Pekerjaan: 'Pegawai Swasta' }];
     triggerCSVDownload(template, 'Template_Import_Warga.csv');
   }
 
@@ -556,7 +859,6 @@
 
     var file = fileInput.files[0];
     var reader = new FileReader();
-
     var btn = document.getElementById('btnProsesImport');
     btn.disabled = true;
     btn.innerText = 'Memproses...';
@@ -568,66 +870,43 @@
       if (parsedData.length === 0) {
         btn.disabled = false;
         btn.innerText = 'Mulai Import';
-        showToast('File CSV kosong atau format header tidak sesuai.', 'error');
+        showToast('File CSV kosong.', 'error');
         return;
       }
 
       if (typeof google !== 'undefined' && google.script && google.script.run) {
-        google.script.run
-          .withSuccessHandler(function(res) {
-            btn.disabled = false;
-            btn.innerText = 'Mulai Import';
-            if (res && res.success) {
-              renderImportResult(res);
-              fetchWargaData(0);
-              refreshData();
-            } else {
-              showToast(res ? res.message : 'Import gagal.', 'error');
-            }
-          })
-          .withFailureHandler(function(err) {
-            btn.disabled = false;
-            btn.innerText = 'Mulai Import';
-            showToast('Error: ' + err.toString(), 'error');
-          })
-          .importWargaBatch(parsedData);
+        google.script.run.withSuccessHandler(function(res) {
+          btn.disabled = false;
+          btn.innerText = 'Mulai Import';
+          if (res && res.success) {
+            renderImportResult(res);
+            fetchWargaData(0);
+            refreshData();
+          }
+        }).importWargaBatch(parsedData);
       } else {
         setTimeout(function() {
           btn.disabled = false;
           btn.innerText = 'Mulai Import';
-          renderImportResult({
-            success: true,
-            importedCount: parsedData.length,
-            duplicates: ['No. KK 3171010000000001 (Budi Santoso)'],
-            message: 'Proses import demo selesai.'
-          });
-          fetchWargaData(0);
+          renderImportResult({ success: true, importedCount: parsedData.length, duplicates: [], message: 'Import selesai.' });
         }, 500);
       }
     };
-
     reader.readAsText(file);
   }
 
   function parseCSVToWargaList(csvText) {
     var lines = csvText.split(/\r\n|\n/);
     if (lines.length <= 1) return [];
-
     var headers = lines[0].split(',').map(function(h) { return h.replace(/"/g, '').trim(); });
     var list = [];
-
     for (var i = 1; i < lines.length; i++) {
       var line = lines[i].trim();
       if (!line) continue;
       var cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(function(c) { return c.replace(/"/g, '').trim(); });
-
       var rowObj = {};
-      for (var h = 0; h < headers.length; h++) {
-        rowObj[headers[h]] = cols[h] || '';
-      }
-      if (rowObj['No_KK'] || rowObj['noKk']) {
-        list.push(rowObj);
-      }
+      for (var h = 0; h < headers.length; h++) rowObj[headers[h]] = cols[h] || '';
+      if (rowObj['No_KK'] || rowObj['noKk']) list.push(rowObj);
     }
     return list;
   }
@@ -635,160 +914,17 @@
   function renderImportResult(res) {
     var notice = document.getElementById('importResultNotice');
     notice.classList.remove('hidden');
-
     var html = '<p class="font-bold text-slate-800 mb-1">' + res.message + '</p>';
-
     if (res.duplicates && res.duplicates.length > 0) {
       notice.className = 'p-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs leading-relaxed max-h-40 overflow-y-auto';
-      html += '<p class="font-bold text-red-600 mt-2 mb-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Peringatan Data Duplikat (' + res.duplicates.length + ' data dilewati):</p>';
-      html += '<ul class="list-disc pl-4 space-y-0.5 text-[11px] text-red-700">';
-      for (var i = 0; i < res.duplicates.length; i++) {
-        html += '<li>' + res.duplicates[i] + '</li>';
-      }
+      html += '<p class="font-bold text-red-600 mt-2 mb-1">Duplikat Dilewati (' + res.duplicates.length + '):</p><ul class="list-disc pl-4 space-y-0.5 text-[11px] text-red-700">';
+      for (var i = 0; i < res.duplicates.length; i++) html += '<li>' + res.duplicates[i] + '</li>';
       html += '</ul>';
     } else {
       notice.className = 'p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs leading-relaxed';
-      html += '<p class="text-emerald-700 mt-1"><i class="fa-solid fa-circle-check mr-1"></i>Seluruh data dalam CSV berhasil diimpor tanpa duplikasi.</p>';
+      html += '<p class="text-emerald-700 mt-1"><i class="fa-solid fa-circle-check mr-1"></i>Seluruh data CSV diimpor.</p>';
     }
-
     notice.innerHTML = html;
-  }
-
-  function debounceFetchIuran() {
-    clearTimeout(debounceTimerIuran);
-    debounceTimerIuran = setTimeout(function() { fetchIuranData(0); }, 350);
-  }
-
-  function fetchIuranData(offset) {
-    offset = offset || 0;
-    var status = document.getElementById('filterIuranStatus').value;
-    var jenis = document.getElementById('filterIuranJenis').value;
-    var search = document.getElementById('filterIuranSearch').value;
-    var params = { limit: 10, offset: offset, statusBayar: status, jenisIuran: jenis, search: search, noKk: currentUser && currentUser.role === 'Warga' ? currentUser.noKk : '' };
-
-    var tbody = document.getElementById('iuranTableBody');
-    tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat...</td></tr>';
-
-    if (typeof google !== 'undefined' && google.script && google.script.run) {
-      google.script.run.withSuccessHandler(function(res) {
-        if (res && res.success) renderIuranTable(res);
-      }).getIuranList(params);
-    } else {
-      setTimeout(function() {
-        renderIuranTable({
-          data: [{ idIuran: 'IUR-0001', namaWarga: 'Budi Santoso', noKk: '3171010000000001', bulanTahun: 'Agustus 2026', jenisIuran: 'Iuran Sampah', nominal: '25000', statusBayar: 'Lunas', approvedBy: 'Siti Rahmawati' }],
-          total: 1, page: 1, totalPages: 1
-        });
-      }, 300);
-    }
-  }
-
-  function renderIuranTable(res) {
-    var tbody = document.getElementById('iuranTableBody');
-    tbody.innerHTML = '';
-    if (!res.data || res.data.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400">Tidak ada data.</td></tr>';
-      document.getElementById('iuranPaginationInfo').innerText = 'Menampilkan 0 data';
-      document.getElementById('iuranPaginationBtns').innerHTML = '';
-      return;
-    }
-
-    for (var i = 0; i < res.data.length; i++) {
-      var row = res.data[i];
-      var tr = document.createElement('tr');
-      tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
-
-      var statusBadge = '';
-      if (row.statusBayar === 'Lunas') statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800"><i class="fa-solid fa-check mr-1"></i>Lunas</span>';
-      else if (row.statusBayar === 'Menunggu Approval') statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800"><i class="fa-solid fa-clock mr-1"></i>Menunggu</span>';
-      else statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800"><i class="fa-solid fa-circle-xmark mr-1"></i>Belum</span>';
-
-      var actionBtns = '-';
-      var isPengurus = currentUser && (currentUser.role === 'Super Admin' || currentUser.statusUser === 'Pengurus RT');
-      if (isPengurus && row.statusBayar === 'Menunggu Approval') {
-        actionBtns = '<div class="flex items-center justify-center gap-1.5"><button onclick="handleApproveIuran(\'' + row.idIuran + '\', \'APPROVE\')" class="p-1 px-2 rounded-lg bg-emerald-600 text-white font-bold text-[10px]">Setujui</button><button onclick="handleApproveIuran(\'' + row.idIuran + '\', \'REJECT\')" class="p-1 px-2 rounded-lg bg-rose-100 text-rose-600 font-bold text-[10px]">Tolak</button></div>';
-      } else if (!isPengurus && row.statusBayar === 'Belum Bayar') {
-        actionBtns = '<button onclick="handleBayarIuranWarga(\'' + row.idIuran + '\')" class="p-1 px-3 rounded-full bg-brand-pink text-white font-bold text-[10px]">Konfirmasi</button>';
-      }
-
-      tr.innerHTML = 
-        '<td class="p-3.5"><p class="font-mono font-bold text-brand-indigo text-[11px]">' + row.idIuran + '</p><p class="font-semibold text-slate-800">' + row.namaWarga + '</p></td>' +
-        '<td class="p-3.5"><p class="font-bold text-slate-700">' + row.jenisIuran + '</p><p class="text-[10px] text-slate-400">' + row.bulanTahun + '</p></td>' +
-        '<td class="p-3.5 font-black text-slate-800">' + formatRupiah(row.nominal) + '</td>' +
-        '<td class="p-3.5">' + statusBadge + '</td>' +
-        '<td class="p-3.5 text-slate-500 text-[11px]">' + (row.approvedBy || '-') + '</td>' +
-        '<td class="p-3.5 text-center">' + actionBtns + '</td>';
-      tbody.appendChild(tr);
-    }
-    document.getElementById('iuranPaginationInfo').innerText = 'Halaman ' + res.page + ' dari ' + res.totalPages;
-    renderPaginationButtons('iuranPaginationBtns', res.page, res.totalPages, 'fetchIuranData');
-  }
-
-  function renderPaginationButtons(containerId, currentPage, totalPages, fetchFnName) {
-    var container = document.getElementById(containerId);
-    container.innerHTML = '';
-    if (totalPages <= 1) return;
-    var prevBtn = document.createElement('button');
-    prevBtn.className = 'px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 disabled:opacity-40';
-    prevBtn.disabled = currentPage <= 1;
-    prevBtn.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
-    prevBtn.onclick = function() { window[fetchFnName]((currentPage - 2) * 10); };
-    container.appendChild(prevBtn);
-    var nextBtn = document.createElement('button');
-    nextBtn.className = 'px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 disabled:opacity-40';
-    nextBtn.disabled = currentPage >= totalPages;
-    nextBtn.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
-    nextBtn.onclick = function() { window[fetchFnName](currentPage * 10); };
-    container.appendChild(nextBtn);
-  }
-
-  function handleBayarIuranWarga(idIuran) {
-    showToast('Mengirim konfirmasi...', 'info');
-    if (typeof google !== 'undefined' && google.script && google.script.run) {
-      google.script.run.withSuccessHandler(function(res) {
-        if (res && res.success) { showToast(res.message, 'success'); fetchIuranData(0); refreshData(); }
-        else { showToast(res ? res.message : 'Gagal.', 'error'); }
-      }).konfirmasiBayarIuran(idIuran, currentUser ? currentUser.noKk : '');
-    } else {
-      setTimeout(function() { showToast('Berhasil (Demo)', 'success'); fetchIuranData(0); }, 400);
-    }
-  }
-
-  function handleApproveIuran(idIuran, action) {
-    var approver = currentUser ? currentUser.nama : 'Pengurus RT';
-    showToast('Memproses...', 'info');
-    if (typeof google !== 'undefined' && google.script && google.script.run) {
-      google.script.run.withSuccessHandler(function(res) {
-        if (res && res.success) { showToast(res.message, 'success'); fetchIuranData(0); refreshData(); }
-      }).approveIuran(idIuran, approver, action);
-    } else {
-      setTimeout(function() { showToast('Dipproses (Demo)', 'success'); fetchIuranData(0); }, 400);
-    }
-  }
-
-  function handleGenerateIuranMassal() {
-    var bulan = document.getElementById('genBulanTahun').value.trim();
-    var jenis = document.getElementById('genJenisIuran').value;
-    var nominal = document.getElementById('genNominal').value;
-    var btn = document.getElementById('btnSubmitGenerate');
-    btn.disabled = true;
-    btn.innerText = 'Menerbitkan...';
-
-    if (typeof google !== 'undefined' && google.script && google.script.run) {
-      google.script.run.withSuccessHandler(function(res) {
-        btn.disabled = false; btn.innerText = 'Terbitkan Sekarang';
-        closeModal('modalGenerateIuran');
-        if (res && res.success) { showToast(res.message, 'success'); fetchIuranData(0); refreshData(); }
-        else { showToast(res ? res.message : 'Gagal.', 'error'); }
-      }).generateTagihanBulananMassal(bulan, jenis, nominal);
-    } else {
-      setTimeout(function() {
-        btn.disabled = false; btn.innerText = 'Terbitkan Sekarang';
-        closeModal('modalGenerateIuran');
-        showToast('Berhasil (Demo)', 'success');
-        fetchIuranData(0);
-      }, 400);
-    }
   }
 
   function fetchFamilyData(targetKk) {
@@ -806,7 +942,7 @@
     } else {
       setTimeout(function() {
         renderFamilyDetails({
-          kepalaKeluarga: { nama: 'Budi Santoso', noKk: noKk, alamat: 'Kamp. Baru I Jl. Marga Mulya No. 01' },
+          kepalaKeluarga: { nama: 'Budi Santoso', noKk: noKk, alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim' },
           anggota: [{ idAnggota: 'AGT-0001', noKk: noKk, namaAnggota: 'Dewi Lestari', hubunganKeluarga: 'Istri', tanggalLahir: '12/04/1988', umur: '36', jenisKelamin: 'Perempuan' }]
         });
       }, 300);
@@ -833,21 +969,14 @@
       card.className = 'p-4 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-between hover:shadow-md transition';
       var icon = agt.jenisKelamin === 'Perempuan' ? 'fa-female text-pink-500' : 'fa-male text-indigo-500';
 
-      var namaEsc = encodeURIComponent(agt.namaAnggota || '');
-      var hubEsc = encodeURIComponent(agt.hubunganKeluarga || '');
-      var tglEsc = encodeURIComponent(agt.tanggalLahir || '');
-
       card.innerHTML = 
         '<div class="flex items-center gap-3">' +
           '<div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-lg"><i class="fa-solid ' + icon + '"></i></div>' +
-          '<div>' +
-            '<h5 class="text-xs font-bold text-slate-800">' + agt.namaAnggota + '</h5>' +
-            '<p class="text-[11px] text-slate-500">' + agt.hubunganKeluarga + ' • ' + agt.umur + ' Thn</p>' +
-          '</div>' +
+          '<div><h5 class="text-xs font-bold text-slate-800">' + agt.namaAnggota + '</h5><p class="text-[11px] text-slate-500">' + agt.hubunganKeluarga + ' • ' + agt.umur + ' Thn</p></div>' +
         '</div>' +
         '<div class="flex items-center gap-1">' +
-          '<button onclick="editAnggota(\'' + agt.idAnggota + '\', \'' + namaEsc + '\', \'' + hubEsc + '\', \'' + tglEsc + '\', \'' + agt.umur + '\', \'' + agt.jenisKelamin + '\')" class="p-2 rounded-lg text-slate-400 hover:text-brand-indigo hover:bg-slate-100 transition text-xs" title="Edit Anggota"><i class="fa-solid fa-pen-to-square"></i></button>' +
-          '<button onclick="handleDeleteAnggota(\'' + agt.idAnggota + '\')" class="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition text-xs" title="Hapus Anggota"><i class="fa-solid fa-trash-can"></i></button>' +
+          '<button onclick="editAnggota(\'' + agt.idAnggota + '\', \'' + encodeURIComponent(agt.namaAnggota) + '\', \'' + encodeURIComponent(agt.hubunganKeluarga) + '\', \'' + encodeURIComponent(agt.tanggalLahir) + '\', \'' + agt.umur + '\', \'' + agt.jenisKelamin + '\')" class="p-2 rounded-lg text-slate-400 hover:text-brand-indigo hover:bg-slate-100 transition text-xs"><i class="fa-solid fa-pen-to-square"></i></button>' +
+          '<button onclick="handleDeleteAnggota(\'' + agt.idAnggota + '\')" class="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition text-xs"><i class="fa-solid fa-trash-can"></i></button>' +
         '</div>';
       container.appendChild(card);
     }
@@ -867,23 +996,14 @@
   }
 
   function editAnggota(id, namaEnc, hubEnc, tglEnc, umur, gender) {
-    var nama = decodeURIComponent(namaEnc || '');
-    var hubungan = decodeURIComponent(hubEnc || '');
-    var tgl = decodeURIComponent(tglEnc || '');
-
     document.getElementById('formAnggotaId').value = id;
     document.getElementById('formAnggotaKk').value = currentFamilyNoKk || (currentUser ? currentUser.noKk : '');
-    document.getElementById('formAnggotaNama').value = nama;
-    document.getElementById('formAnggotaHubungan').value = hubungan;
-    document.getElementById('formAnggotaTglLahir').value = tgl;
+    document.getElementById('formAnggotaNama').value = decodeURIComponent(namaEnc || '');
+    document.getElementById('formAnggotaHubungan').value = decodeURIComponent(hubEnc || '');
+    document.getElementById('formAnggotaTglLahir').value = decodeURIComponent(tglEnc || '');
     document.getElementById('formAnggotaUmurVal').value = umur || '0';
     document.getElementById('formAnggotaUmurDisplay').value = (umur || '0') + ' Tahun';
     document.getElementById('formAnggotaGender').value = gender || 'Perempuan';
-
-    if (tgl) {
-      calculateAgeRealtime(tgl, 'formAnggotaUmurDisplay', 'formAnggotaUmurVal');
-    }
-
     document.getElementById('modalAnggotaTitle').innerText = 'Edit Data Anggota Keluarga';
     document.getElementById('modalAnggota').classList.remove('hidden');
   }
@@ -899,28 +1019,26 @@
       jenisKelamin: document.getElementById('formAnggotaGender').value
     };
     var btn = document.getElementById('btnSaveAnggota');
-    btn.disabled = true; 
+    btn.disabled = true;
     btn.innerText = 'Menyimpan...';
 
     if (typeof google !== 'undefined' && google.script && google.script.run) {
       google.script.run.withSuccessHandler(function(res) {
-        btn.disabled = false; 
+        btn.disabled = false;
         btn.innerText = 'Simpan Data';
         closeModal('modalAnggota');
-        if (res && res.success) { 
-          showToast(res.message, 'success'); 
-          fetchFamilyData(currentFamilyNoKk); 
-          refreshData(); 
-        } else {
-          showToast(res ? res.message : 'Gagal menyimpan.', 'error');
+        if (res && res.success) {
+          showToast(res.message, 'success');
+          fetchFamilyData(currentFamilyNoKk);
+          refreshData();
         }
       }).saveAnggotaKeluarga(payload);
     } else {
       setTimeout(function() {
-        btn.disabled = false; 
+        btn.disabled = false;
         btn.innerText = 'Simpan Data';
         closeModal('modalAnggota');
-        showToast('Berhasil disimpan (Demo)', 'success');
+        showToast('Berhasil disimpan.', 'success');
         fetchFamilyData(currentFamilyNoKk);
       }, 400);
     }
@@ -930,18 +1048,16 @@
     showToast('Menghapus...', 'info');
     if (typeof google !== 'undefined' && google.script && google.script.run) {
       google.script.run.withSuccessHandler(function(res) {
-        if (res && res.success) { 
-          showToast(res.message, 'success'); 
-          fetchFamilyData(currentFamilyNoKk); 
-          refreshData(); 
-        } else {
-          showToast(res ? res.message : 'Gagal menghapus.', 'error');
+        if (res && res.success) {
+          showToast(res.message, 'success');
+          fetchFamilyData(currentFamilyNoKk);
+          refreshData();
         }
       }).deleteAnggotaKeluarga(idAnggota);
     } else {
-      setTimeout(function() { 
-        showToast('Dihapus (Demo)', 'success'); 
-        fetchFamilyData(currentFamilyNoKk); 
+      setTimeout(function() {
+        showToast('Dihapus (Demo)', 'success');
+        fetchFamilyData(currentFamilyNoKk);
       }, 300);
     }
   }
@@ -949,19 +1065,16 @@
   function fetchMadingData() {
     var search = document.getElementById('filterMadingSearch') ? document.getElementById('filterMadingSearch').value : '';
     var container = document.getElementById('madingListContainer');
-    container.innerHTML = '<div class="col-span-full p-6 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat informasi mading...</div>';
+    container.innerHTML = '<div class="col-span-full p-6 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat mading...</div>';
 
     var params = { search: search, role: currentUser ? currentUser.role : 'Warga' };
-
     if (typeof google !== 'undefined' && google.script && google.script.run) {
       google.script.run.withSuccessHandler(function(res) {
         if (res && res.success) renderMadingCards(res.data);
       }).getMadingList(params);
     } else {
       setTimeout(function() {
-        renderMadingCards([
-          { idMading: 'MAD-0001', judul: 'Kerja Bakti Massal RT 05', tanggalKegiatan: '10 September 2026', note: 'Diharapkan seluruh warga hadir membawa alat kebersihan.', statusPublish: 'Published', pembuat: 'Budi Santoso (Ketua RT)' }
-        ]);
+        renderMadingCards([{ idMading: 'MAD-0001', judul: 'Kerja Bakti Bulanan RT 010', tanggalKegiatan: '10 September 2026', note: 'Diharapkan seluruh warga hadir membawa alat kebersihan.', statusPublish: 'Published', pembuat: 'Budi Santoso (Ketua RT)' }]);
       }, 300);
     }
   }
@@ -969,9 +1082,8 @@
   function renderMadingCards(list) {
     var container = document.getElementById('madingListContainer');
     container.innerHTML = '';
-
     if (!list || list.length === 0) {
-      container.innerHTML = '<div class="col-span-full p-8 text-center bg-white rounded-2xl border border-slate-200 text-slate-400 text-xs">Belum ada informasi mading atau pengumuman yang tersedia.</div>';
+      container.innerHTML = '<div class="col-span-full p-8 text-center bg-white rounded-2xl border border-slate-200 text-slate-400 text-xs">Belum ada informasi mading.</div>';
       return;
     }
 
@@ -1058,8 +1170,6 @@
           showToast(res.message, 'success');
           fetchMadingData();
           refreshData();
-        } else {
-          showToast(res ? res.message : 'Gagal menyimpan.', 'error');
         }
       }).saveMading(payload);
     } else {
@@ -1067,7 +1177,7 @@
         btn.disabled = false;
         btn.innerText = 'Simpan & Publikasikan';
         closeModal('modalMading');
-        showToast('Berhasil disimpan (Demo)', 'success');
+        showToast('Berhasil disimpan.', 'success');
         fetchMadingData();
       }, 400);
     }
@@ -1075,15 +1185,12 @@
 
   function deleteMading(idMading) {
     showToast('Menghapus...', 'info');
-
     if (typeof google !== 'undefined' && google.script && google.script.run) {
       google.script.run.withSuccessHandler(function(res) {
         if (res && res.success) {
           showToast(res.message, 'success');
           fetchMadingData();
           refreshData();
-        } else {
-          showToast(res ? res.message : 'Gagal menghapus.', 'error');
         }
       }).deleteMading(idMading);
     } else {
@@ -1094,8 +1201,22 @@
     }
   }
 
-  function openModalGenerateIuran() {
-    document.getElementById('modalGenerateIuran').classList.remove('hidden');
+  function renderPaginationButtons(containerId, currentPage, totalPages, fetchFnName) {
+    var container = document.getElementById(containerId);
+    container.innerHTML = '';
+    if (totalPages <= 1) return;
+    var prevBtn = document.createElement('button');
+    prevBtn.className = 'px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 disabled:opacity-40';
+    prevBtn.disabled = currentPage <= 1;
+    prevBtn.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
+    prevBtn.onclick = function() { window[fetchFnName]((currentPage - 2) * 10); };
+    container.appendChild(prevBtn);
+    var nextBtn = document.createElement('button');
+    nextBtn.className = 'px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 disabled:opacity-40';
+    nextBtn.disabled = currentPage >= totalPages;
+    nextBtn.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+    nextBtn.onclick = function() { window[fetchFnName](currentPage * 10); };
+    container.appendChild(nextBtn);
   }
 
   function closeModal(modalId) {
