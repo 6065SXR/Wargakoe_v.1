@@ -1,6 +1,6 @@
 /**
  * ====================================================================
- * WARGAKOE - BACKEND LOGIC & CRUD OPERATIONS
+ * WARGAKOE - BACKEND LOGIC & CRUD OPERATIONS WITH DYNAMIC HEADERS
  * By Zettbos System (ZettBOT 3.1)
  * ====================================================================
  */
@@ -9,7 +9,7 @@ function doGet(e) {
   try {
     var template = HtmlService.createTemplateFromFile('index');
     return template.evaluate()
-      .setTitle('Wargakoe - Sistem Pengelolaan Warga & Iuran RT')
+      .setTitle('Wargakoe - Sistem Pengelolaan Warga & Iuran RT 010')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   } catch (err) {
@@ -51,6 +51,38 @@ function generateSequentialId_(prefix, sheetName) {
   var nextNum = maxNum + 1;
   var padded = ('0000' + nextNum).slice(-4);
   return prefix + '-' + padded;
+}
+
+function getNextKuitansiNo() {
+  try {
+    var todayStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'yyyyMMdd');
+    var sheet = getSheet_('IURAN');
+    var lastRow = sheet.getLastRow();
+    
+    var countToday = 0;
+    if (lastRow > 1) {
+      var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+      var kwiIdx = headers.indexOf('No_Kuitansi');
+      if (kwiIdx !== -1) {
+        var data = sheet.getRange(2, kwiIdx + 1, lastRow - 1, 1).getDisplayValues();
+        for (var i = 0; i < data.length; i++) {
+          var kwi = data[i][0];
+          if (kwi && kwi.indexOf(todayStr) === 0) {
+            var seq = parseInt(kwi.substring(8), 10);
+            if (!isNaN(seq) && seq > countToday) {
+              countToday = seq;
+            }
+          }
+        }
+      }
+    }
+    
+    var nextSeq = countToday + 1;
+    var seqStr = ('0' + nextSeq).slice(-2);
+    return { success: true, noKuitansi: todayStr + seqStr };
+  } catch (error) {
+    return { success: false, message: 'Gagal generate No Kuitansi: ' + error.toString() };
+  }
 }
 
 function loginUser(noHp, password) {
@@ -173,6 +205,7 @@ function getDashboardSummary(userRole, userNoKk) {
       lansia: 0,
       totalWarga: totalWarga,
       totalKk: totalKk,
+      kasTerkumpul: 0,
       kasRtBulanIni: 0,
       kasKematianBulanIni: 0,
       iuranSampahBulanIni: 0,
@@ -181,7 +214,7 @@ function getDashboardSummary(userRole, userNoKk) {
       totalTerkumpul: 0,
       totalMenunggu: 0,
       totalBelumBayar: 0,
-      tagihanSaya: [],
+      unpaidDuesList: [],
       madingTerbaru: []
     };
 
@@ -216,32 +249,49 @@ function getDashboardSummary(userRole, userNoKk) {
 
       for (var k = 1; k < iurData.length; k++) {
         var row = iurData[k];
+        var idIur = row[iHeaders.indexOf('ID_Iuran')] || '';
+        var kwiNo = row[iHeaders.indexOf('No_Kuitansi')] || '';
+
+        // Lewati data legacy KWI-IUR-
+        if (idIur.indexOf('KWI-IUR-') === 0 || kwiNo.indexOf('KWI-IUR-') === 0) continue;
+
         var nominal = parseFloat(row[iNominalIdx]) || 0;
-        var status = row[iStatusIdx];
+        var status = (row[iStatusIdx] || '').trim();
         var jenis = row[iJenisIdx];
         var kk = row[iKkIdx];
 
-        if (status === 'Lunas') {
+        if (status === 'Sudah bayar' || status === 'Lunas') {
           stats.totalTerkumpul += nominal;
-          if (jenis === 'Iuran RT') stats.kasRtBulanIni += nominal;
-          else if (jenis === 'Iuran Duka') stats.kasKematianBulanIni += nominal;
-          else if (jenis === 'Iuran Sampah') stats.iuranSampahBulanIni += nominal;
-          else if (jenis === 'Iuran Sosial') stats.iuranSosialBulanIni += nominal;
-          else stats.iuranLainBulanIni += nominal;
-        } else if (status === 'Menunggu Approval') {
+          if (jenis === 'Iuran Kas' || jenis === 'Iuran RT') {
+            stats.kasTerkumpul += nominal;
+            stats.kasRtBulanIni += nominal;
+          } else if (jenis === 'Iuran Duka' || jenis === 'Iuran Kematian') {
+            stats.kasKematianBulanIni += nominal;
+          } else if (jenis === 'Iuran Sampah') {
+            stats.iuranSampahBulanIni += nominal;
+          } else if (jenis === 'Iuran Sosial') {
+            stats.iuranSosialBulanIni += nominal;
+          } else {
+            stats.iuranLainBulanIni += nominal;
+          }
+        } else if (status === 'Menunggu' || status === 'Menunggu Approval') {
           stats.totalMenunggu += nominal;
         } else {
           stats.totalBelumBayar += nominal;
         }
 
-        if (userRole === 'Warga' && kk === userNoKk && status !== 'Lunas') {
-          stats.tagihanSaya.push({
-            idIuran: row[iHeaders.indexOf('ID_Iuran')],
-            jenisIuran: jenis,
-            bulanTahun: row[iHeaders.indexOf('Bulan_Tahun')],
-            nominal: nominal,
-            statusBayar: status
-          });
+        if (userRole !== 'Super Admin' && kk === userNoKk) {
+          if (status !== 'Sudah bayar' && status !== 'Lunas') {
+            stats.unpaidDuesList.push({
+              idIuran: idIur,
+              noKuitansi: kwiNo,
+              namaWarga: row[iHeaders.indexOf('Nama_Warga')],
+              jenisIuran: jenis,
+              bulanTahun: row[iHeaders.indexOf('Bulan_Tahun')],
+              nominal: nominal,
+              statusBayar: status
+            });
+          }
         }
       }
     }
@@ -326,6 +376,240 @@ function getKasRtDetails(bulanTahun) {
   }
 }
 
+function savePengeluaranRutin(payload) {
+  try {
+    var sheet = getSheet_('KAS_RT');
+    var nowStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
+    var newId = generateSequentialId_('KAS', 'KAS_RT');
+
+    sheet.appendRow([
+      newId,
+      String(payload.tanggal || '').trim(),
+      'Pengeluaran',
+      String(payload.kategori || 'Iuran Kas').trim(),
+      String(payload.keterangan || '').trim(),
+      String(payload.nominal || '0').trim(),
+      String(payload.bulanTahun || '').trim(),
+      nowStr
+    ]);
+    SpreadsheetApp.flush();
+    return { success: true, message: 'Pengeluaran rutin berhasil dicatat!' };
+  } catch (error) {
+    return { success: false, message: 'Gagal mencatat pengeluaran: ' + error.toString() };
+  }
+}
+
+function getIuranList(params) {
+  try {
+    params = params || {};
+    var limit = parseInt(params.limit, 10) || 10;
+    var offset = parseInt(params.offset, 10) || 0;
+    var search = (params.search || '').toLowerCase().trim();
+    var filterStatus = params.statusBayar || 'SEMUA';
+    var filterJenis = params.jenisIuran || 'SEMUA';
+    var userRole = params.role || 'Warga';
+    var filterKk = params.noKk || '';
+
+    var sheet = getSheet_('IURAN');
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+
+    if (headers.indexOf('No_Kuitansi') !== 1) {
+      repairIuranSheet_(SpreadsheetApp.getActiveSpreadsheet());
+      sheet = getSheet_('IURAN');
+      headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+    }
+
+    var rawData = sheet.getDataRange().getDisplayValues();
+    if (rawData.length <= 1) return { success: true, data: [], total: 0, page: 1, totalPages: 0 };
+
+    var filtered = [];
+    for (var i = 1; i < rawData.length; i++) {
+      var row = rawData[i];
+      var id = row[headers.indexOf('ID_Iuran')] || '';
+      var kwi = row[headers.indexOf('No_Kuitansi')] || '';
+
+      // Hapus & lewati seluruh data legacy KWI-IUR-
+      if (id.indexOf('KWI-IUR-') === 0 || kwi.indexOf('KWI-IUR-') === 0) {
+        continue;
+      }
+
+      var kk = row[headers.indexOf('No_KK')] || '';
+      var nama = (row[headers.indexOf('Nama_Warga')] || '').toLowerCase();
+      var jenis = row[headers.indexOf('Jenis_Iuran')] || '';
+      var status = (row[headers.indexOf('Status_Bayar')] || '').trim();
+
+      if (status === 'Menunggu Approval' || status === 'Pending') status = 'Menunggu';
+      if (status === 'Lunas') status = 'Sudah bayar';
+
+      if (userRole === 'Warga' && filterKk && kk !== filterKk) {
+        continue;
+      }
+
+      var matchSearch = !search || (nama.indexOf(search) !== -1 || kk.indexOf(search) !== -1 || id.toLowerCase().indexOf(search) !== -1 || kwi.toLowerCase().indexOf(search) !== -1);
+      var matchStatus = filterStatus === 'SEMUA' || status === filterStatus || (filterStatus === 'Menunggu' && (status === 'Menunggu' || status === 'Menunggu Approval'));
+      var matchJenis = filterJenis === 'SEMUA' || jenis === filterJenis;
+
+      if (matchSearch && matchStatus && matchJenis) {
+        filtered.push({
+          idIuran: id,
+          noKuitansi: kwi,
+          noKk: kk,
+          namaWarga: row[headers.indexOf('Nama_Warga')],
+          bulanTahun: row[headers.indexOf('Bulan_Tahun')],
+          jenisIuran: jenis,
+          nominal: row[headers.indexOf('Nominal')],
+          statusBayar: status,
+          tanggalBayar: row[headers.indexOf('Tanggal_Bayar')],
+          approvedBy: row[headers.indexOf('Approved_By')]
+        });
+      }
+    }
+
+    // PENGURUTAN PRIORITAS: Posisikan status "Menunggu" selalu di urutan TERATAS (Top of Page 1)
+    filtered.sort(function(a, b) {
+      var aIsPending = (a.statusBayar === 'Menunggu' || a.statusBayar === 'Menunggu Approval');
+      var bIsPending = (b.statusBayar === 'Menunggu' || b.statusBayar === 'Menunggu Approval');
+      if (aIsPending && !bIsPending) return -1;
+      if (!aIsPending && bIsPending) return 1;
+      return 0;
+    });
+
+    var total = filtered.length;
+    var paginated = filtered.slice(offset, offset + limit);
+    var totalPages = Math.ceil(total / limit) || 1;
+    var currentPage = Math.floor(offset / limit) + 1;
+
+    return { success: true, data: paginated, total: total, page: currentPage, totalPages: totalPages };
+  } catch (error) {
+    return { success: false, message: 'Gagal memuat data iuran: ' + error.toString() };
+  }
+}
+
+function submitBayarIuran(payload) {
+  try {
+    var sheet = getSheet_('IURAN');
+    var nowStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
+    var newId = generateSequentialId_('IUR', 'IURAN');
+
+    var newRow = [
+      newId,
+      String(payload.noKuitansi || '').trim(),
+      String(payload.noKk || '').trim(),
+      String(payload.namaWarga || '').trim(),
+      String(payload.bulanTahun || '').trim(),
+      String(payload.jenisIuran || 'Iuran Kas').trim(),
+      String(payload.nominal || '0').trim(),
+      'Menunggu',
+      String(payload.tanggalBayar || nowStr).trim(),
+      '-',
+      nowStr
+    ];
+
+    sheet.appendRow(newRow);
+    SpreadsheetApp.flush();
+
+    return { success: true, message: 'Pembayaran iuran berhasil dikirim! Status: Menunggu verifikasi Pengurus RT.' };
+  } catch (error) {
+    return { success: false, message: 'Gagal kirim pembayaran: ' + error.toString() };
+  }
+}
+
+function approveIuran(idIuran, approverName, action) {
+  try {
+    var sheet = getSheet_('IURAN');
+    var data = sheet.getDataRange().getDisplayValues();
+    var headers = data[0];
+    var nowStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
+    var newStatus = action === 'APPROVE' ? 'Sudah bayar' : 'Ditolak';
+
+    var idIdx = headers.indexOf('ID_Iuran');
+    var statusIdx = headers.indexOf('Status_Bayar');
+    var approvedIdx = headers.indexOf('Approved_By');
+
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][idIdx] === idIuran) {
+        var r = i + 1;
+        sheet.getRange(r, statusIdx + 1).setValue(newStatus);
+        sheet.getRange(r, approvedIdx + 1).setValue(approverName || 'Pengurus RT');
+        
+        if (action === 'APPROVE') {
+          var kasSheet = getSheet_('KAS_RT');
+          var kasId = generateSequentialId_('KAS', 'KAS_RT');
+          kasSheet.appendRow([
+            kasId,
+            nowStr.substring(0, 10),
+            'Pemasukan',
+            data[i][headers.indexOf('Jenis_Iuran')],
+            'Iuran dari ' + data[i][headers.indexOf('Nama_Warga')] + ' (' + data[i][headers.indexOf('No_Kuitansi')] + ')',
+            data[i][headers.indexOf('Nominal')],
+            data[i][headers.indexOf('Bulan_Tahun')],
+            nowStr
+          ]);
+        }
+        
+        SpreadsheetApp.flush();
+        return { 
+          success: true, 
+          message: action === 'APPROVE' ? 'Pembayaran iuran DITERIMA (Sudah bayar).' : 'Pembayaran iuran DITOLAK.' 
+        };
+      }
+    }
+    return { success: false, message: 'ID Iuran ' + idIuran + ' tidak ditemukan.' };
+  } catch (error) {
+    return { success: false, message: 'Gagal memproses verifikasi: ' + error.toString() };
+  }
+}
+
+function getLaporanKeuanganData(jenisFilter) {
+  try {
+    var iurSheet = getSheet_('IURAN');
+    var iurData = iurSheet.getDataRange().getDisplayValues();
+    if (iurData.length <= 1) return { success: true, data: [] };
+
+    var headers = iurData[0];
+    var list = [];
+    var totalNominal = 0;
+
+    for (var i = 1; i < iurData.length; i++) {
+      var row = iurData[i];
+      var idIur = row[headers.indexOf('ID_Iuran')] || '';
+      var kwiNo = row[headers.indexOf('No_Kuitansi')] || '';
+
+      if (idIur.indexOf('KWI-IUR-') === 0 || kwiNo.indexOf('KWI-IUR-') === 0) continue;
+
+      var jenis = row[headers.indexOf('Jenis_Iuran')];
+      var status = (row[headers.indexOf('Status_Bayar')] || '').trim();
+
+      var matchFilter = (!jenisFilter || jenisFilter === 'SEMUA' || jenis === jenisFilter);
+      if (matchFilter && (status === 'Sudah bayar' || status === 'Lunas')) {
+        var nom = parseFloat(row[headers.indexOf('Nominal')]) || 0;
+        totalNominal += nom;
+        list.push({
+          noKuitansi: kwiNo,
+          namaWarga: row[headers.indexOf('Nama_Warga')],
+          jenisIuran: jenis,
+          bulanTahun: row[headers.indexOf('Bulan_Tahun')],
+          nominal: nom,
+          tanggalBayar: row[headers.indexOf('Tanggal_Bayar')],
+          approvedBy: row[headers.indexOf('Approved_By')]
+        });
+      }
+    }
+
+    return {
+      success: true,
+      data: list,
+      totalNominal: totalNominal,
+      kopInfo: {
+        rtRw: 'PENGURUS RT 010 RW 05',
+        alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim Perdana Kusuma'
+      }
+    };
+  } catch (error) {
+    return { success: false, message: 'Gagal memuat laporan keuangan: ' + error.toString() };
+  }
+}
+
 function getWargaList(params) {
   try {
     params = params || {};
@@ -378,123 +662,6 @@ function getWargaList(params) {
     return { success: true, data: paginated, total: total, page: currentPage, totalPages: totalPages };
   } catch (error) {
     return { success: false, message: 'Gagal mengambil data warga: ' + error.toString() };
-  }
-}
-
-function getAllWargaForExport() {
-  try {
-    var sheet = getSheet_('USERS');
-    var data = sheet.getDataRange().getDisplayValues();
-    if (data.length <= 1) return { success: true, data: [] };
-
-    var headers = data[0];
-    var list = [];
-    for (var i = 1; i < data.length; i++) {
-      var row = data[i];
-      list.push({
-        noKk: row[headers.indexOf('No_KK')],
-        noKtp: row[headers.indexOf('No_KTP')],
-        nama: row[headers.indexOf('Nama')],
-        noHp: row[headers.indexOf('No_HP')],
-        role: row[headers.indexOf('Role')],
-        statusUser: row[headers.indexOf('Status_User')],
-        tanggalLahir: row[headers.indexOf('Tanggal_Lahir')],
-        umur: row[headers.indexOf('Umur')],
-        alamat: row[headers.indexOf('Alamat')],
-        jenisKelamin: row[headers.indexOf('Jenis_Kelamin')],
-        statusKeluarga: row[headers.indexOf('Status_Keluarga')],
-        statusRumah: row[headers.indexOf('Status_Rumah')],
-        pendidikan: row[headers.indexOf('Pendidikan')],
-        pekerjaan: row[headers.indexOf('Pekerjaan')]
-      });
-    }
-    return { success: true, data: list };
-  } catch (error) {
-    return { success: false, message: 'Gagal mengambil data export: ' + error.toString() };
-  }
-}
-
-function importWargaBatch(wargaList) {
-  try {
-    if (!wargaList || !Array.isArray(wargaList) || wargaList.length === 0) {
-      return { success: false, message: 'Data yang diimpor kosong atau format tidak valid.' };
-    }
-
-    var sheet = getSheet_('USERS');
-    var data = sheet.getDataRange().getDisplayValues();
-    var headers = data[0];
-
-    var kkIdx = headers.indexOf('No_KK');
-    var ktpIdx = headers.indexOf('No_KTP');
-
-    var existingKk = {};
-    var existingKtp = {};
-
-    for (var i = 1; i < data.length; i++) {
-      if (data[i][kkIdx]) existingKk[data[i][kkIdx].trim()] = true;
-      if (data[i][ktpIdx]) existingKtp[data[i][ktpIdx].trim()] = true;
-    }
-
-    var newRows = [];
-    var duplicates = [];
-    var nowStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
-
-    for (var j = 0; j < wargaList.length; j++) {
-      var item = wargaList[j];
-      var noKk = String(item.noKk || item.No_KK || '').trim();
-      var noKtp = String(item.noKtp || item.No_KTP || '').trim();
-      var nama = String(item.nama || item.Nama || 'Warga').trim();
-
-      if (!noKk || !noKtp) continue;
-
-      var isDup = false;
-      if (existingKk[noKk]) {
-        duplicates.push('No. KK ' + noKk + ' (' + nama + ')');
-        isDup = true;
-      }
-      if (existingKtp[noKtp]) {
-        duplicates.push('NIK/KTP ' + noKtp + ' (' + nama + ')');
-        isDup = true;
-      }
-
-      if (!isDup) {
-        existingKk[noKk] = true;
-        existingKtp[noKtp] = true;
-
-        newRows.push([
-          noKk,
-          noKtp,
-          nama,
-          String(item.noHp || item.No_HP || '').trim(),
-          String(item.password || item.Password || 'warga123').trim(),
-          String(item.role || item.Role || 'Warga').trim(),
-          String(item.statusUser || item.Status_User || 'Warga').trim(),
-          String(item.tanggalLahir || item.Tanggal_Lahir || '').trim(),
-          String(item.umur || item.Umur || '0').trim(),
-          String(item.alamat || item.Alamat || '').trim(),
-          String(item.jenisKelamin || item.Jenis_Kelamin || 'Laki-laki').trim(),
-          String(item.statusKeluarga || item.Status_Keluarga || 'Suami').trim(),
-          String(item.statusRumah || item.Status_Rumah || 'Pribadi').trim(),
-          String(item.pendidikan || item.Pendidikan || 'SMA').trim(),
-          String(item.pekerjaan || item.Pekerjaan || 'Wiraswasta').trim(),
-          nowStr
-        ]);
-      }
-    }
-
-    if (newRows.length > 0) {
-      sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
-      SpreadsheetApp.flush();
-    }
-
-    return {
-      success: true,
-      importedCount: newRows.length,
-      duplicates: duplicates,
-      message: 'Proses import selesai. ' + newRows.length + ' data baru berhasil diimpor.'
-    };
-  } catch (error) {
-    return { success: false, message: 'Gagal import data warga: ' + error.toString() };
   }
 }
 
@@ -601,154 +768,6 @@ function deleteAnggotaKeluarga(idAnggota) {
     return { success: false, message: 'ID Anggota tidak ditemukan.' };
   } catch (error) {
     return { success: false, message: 'Gagal menghapus: ' + error.toString() };
-  }
-}
-
-function getIuranList(params) {
-  try {
-    params = params || {};
-    var limit = parseInt(params.limit, 10) || 10;
-    var offset = parseInt(params.offset, 10) || 0;
-    var search = (params.search || '').toLowerCase().trim();
-    var filterStatus = params.statusBayar || 'SEMUA';
-    var filterJenis = params.jenisIuran || 'SEMUA';
-    var filterKk = params.noKk || '';
-
-    var sheet = getSheet_('IURAN');
-    var rawData = sheet.getDataRange().getDisplayValues();
-    if (rawData.length <= 1) return { success: true, data: [], total: 0, page: 1, totalPages: 0 };
-
-    var headers = rawData[0];
-    var filtered = [];
-    for (var i = 1; i < rawData.length; i++) {
-      var row = rawData[i];
-      var id = row[headers.indexOf('ID_Iuran')];
-      var kk = row[headers.indexOf('No_KK')];
-      var nama = row[headers.indexOf('Nama_Warga')].toLowerCase();
-      var jenis = row[headers.indexOf('Jenis_Iuran')];
-      var status = row[headers.indexOf('Status_Bayar')];
-
-      var matchKk = !filterKk || kk === filterKk;
-      var matchSearch = !search || (nama.indexOf(search) !== -1 || kk.indexOf(search) !== -1 || id.toLowerCase().indexOf(search) !== -1);
-      var matchStatus = filterStatus === 'SEMUA' || status === filterStatus;
-      var matchJenis = filterJenis === 'SEMUA' || jenis === filterJenis;
-
-      if (matchKk && matchSearch && matchStatus && matchJenis) {
-        filtered.push({
-          idIuran: row[headers.indexOf('ID_Iuran')],
-          noKk: row[headers.indexOf('No_KK')],
-          namaWarga: row[headers.indexOf('Nama_Warga')],
-          bulanTahun: row[headers.indexOf('Bulan_Tahun')],
-          jenisIuran: row[headers.indexOf('Jenis_Iuran')],
-          nominal: row[headers.indexOf('Nominal')],
-          statusBayar: row[headers.indexOf('Status_Bayar')],
-          tanggalBayar: row[headers.indexOf('Tanggal_Bayar')],
-          approvedBy: row[headers.indexOf('Approved_By')]
-        });
-      }
-    }
-
-    var total = filtered.length;
-    var paginated = filtered.slice(offset, offset + limit);
-    var totalPages = Math.ceil(total / limit) || 1;
-    var currentPage = Math.floor(offset / limit) + 1;
-
-    return { success: true, data: paginated, total: total, page: currentPage, totalPages: totalPages };
-  } catch (error) {
-    return { success: false, message: 'Gagal memuat data iuran: ' + error.toString() };
-  }
-}
-
-function konfirmasiBayarIuran(idIuran, noKk) {
-  try {
-    var sheet = getSheet_('IURAN');
-    var data = sheet.getDataRange().getDisplayValues();
-    var headers = data[0];
-    var nowStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
-
-    for (var i = 1; i < data.length; i++) {
-      if (data[i][headers.indexOf('ID_Iuran')] === idIuran && (noKk === '' || data[i][headers.indexOf('No_KK')] === noKk)) {
-        var r = i + 1;
-        sheet.getRange(r, headers.indexOf('Status_Bayar') + 1).setValue('Menunggu Approval');
-        sheet.getRange(r, headers.indexOf('Tanggal_Bayar') + 1).setValue(nowStr);
-        SpreadsheetApp.flush();
-        return { success: true, message: 'Konfirmasi pembayaran berhasil dikirim!' };
-      }
-    }
-    return { success: false, message: 'Tagihan iuran tidak ditemukan.' };
-  } catch (error) {
-    return { success: false, message: 'Gagal konfirmasi bayar: ' + error.toString() };
-  }
-}
-
-function approveIuran(idIuran, approverName, action) {
-  try {
-    var sheet = getSheet_('IURAN');
-    var data = sheet.getDataRange().getDisplayValues();
-    var headers = data[0];
-    var nowStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
-    var newStatus = action === 'APPROVE' ? 'Lunas' : 'Belum Bayar';
-
-    for (var i = 1; i < data.length; i++) {
-      if (data[i][headers.indexOf('ID_Iuran')] === idIuran) {
-        var r = i + 1;
-        sheet.getRange(r, headers.indexOf('Status_Bayar') + 1).setValue(newStatus);
-        sheet.getRange(r, headers.indexOf('Approved_By') + 1).setValue(approverName || 'Pengurus RT');
-        if (action === 'APPROVE' && !data[i][headers.indexOf('Tanggal_Bayar')]) {
-          sheet.getRange(r, headers.indexOf('Tanggal_Bayar') + 1).setValue(nowStr);
-        }
-        SpreadsheetApp.flush();
-        return { success: true, message: action === 'APPROVE' ? 'Iuran disetujui (LUNAS).' : 'Iuran ditolak.' };
-      }
-    }
-    return { success: false, message: 'ID Iuran tidak ditemukan.' };
-  } catch (error) {
-    return { success: false, message: 'Gagal memproses approval: ' + error.toString() };
-  }
-}
-
-function generateTagihanBulananMassal(bulanTahun, jenisIuran, nominal) {
-  try {
-    var userSheet = getSheet_('USERS');
-    var iurSheet = getSheet_('IURAN');
-    var userData = userSheet.getDataRange().getDisplayValues();
-    if (userData.length <= 1) return { success: false, message: 'Tidak ada data warga.' };
-
-    var iurData = iurSheet.getDataRange().getDisplayValues();
-    var iHeaders = iurData[0];
-    var uHeaders = userData[0];
-    var nowStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
-    var newRows = [];
-    var count = 0;
-
-    for (var u = 1; u < userData.length; u++) {
-      var noKk = userData[u][uHeaders.indexOf('No_KK')];
-      var nama = userData[u][uHeaders.indexOf('Nama')];
-
-      var exists = false;
-      for (var k = 1; k < iurData.length; k++) {
-        if (iurData[k][iHeaders.indexOf('No_KK')] === noKk && iurData[k][iHeaders.indexOf('Bulan_Tahun')] === bulanTahun && iurData[k][iHeaders.indexOf('Jenis_Iuran')] === jenisIuran) {
-          exists = true;
-          break;
-        }
-      }
-
-      if (!exists) {
-        var idIuran = generateSequentialId_('IUR', 'IURAN');
-        newRows.push([idIuran, noKk, nama, bulanTahun, jenisIuran, String(nominal), 'Belum Bayar', '-', '-', nowStr]);
-        count++;
-      }
-    }
-
-    if (newRows.length > 0) {
-      iurSheet.getRange(iurSheet.getLastRow() + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
-      SpreadsheetApp.flush();
-      return { success: true, message: 'Berhasil menerbitkan ' + count + ' tagihan iuran baru.' };
-    } else {
-      return { success: false, message: 'Seluruh warga sudah memiliki tagihan tersebut.' };
-    }
-  } catch (error) {
-    return { success: false, message: 'Gagal generate tagihan: ' + error.toString() };
   }
 }
 
