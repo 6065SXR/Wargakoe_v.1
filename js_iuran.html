@@ -1,0 +1,263 @@
+<script>
+  function openModalBayarIuran() {
+    document.getElementById('bayarNamaWarga').value = currentUser ? currentUser.nama : 'Warga RT 010';
+    var dateNow = new Date();
+    var months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    document.getElementById('bayarBulanTahun').value = months[dateNow.getMonth()] + ' ' + dateNow.getFullYear();
+    
+    var dayStr = ('0' + dateNow.getDate()).slice(-2);
+    var monthStr = ('0' + (dateNow.getMonth() + 1)).slice(-2);
+    document.getElementById('bayarTanggal').value = dateNow.getFullYear() + '-' + monthStr + '-' + dayStr;
+
+    document.getElementById('bayarJenisIuran').value = 'Iuran Kas';
+    document.getElementById('bayarNominal').value = '50000';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(function(res) {
+        if (res && res.success) {
+          document.getElementById('bayarNoKuitansi').value = res.noKuitansi;
+          document.getElementById('modalBayarIuran').classList.remove('hidden');
+        }
+      }).getNextKuitansiNo();
+    } else {
+      var yyyymmdd = dateNow.getFullYear() + monthStr + dayStr;
+      document.getElementById('bayarNoKuitansi').value = yyyymmdd + '01';
+      document.getElementById('modalBayarIuran').classList.remove('hidden');
+    }
+  }
+
+  function updateDefaultNominalIuran(jenis) {
+    var nomInput = document.getElementById('bayarNominal');
+    if (jenis === 'Iuran Kas') nomInput.value = '50000';
+    else if (jenis === 'Iuran Duka') nomInput.value = '20000';
+    else if (jenis === 'Iuran Sampah') nomInput.value = '25000';
+    else if (jenis === 'Iuran Sosial') nomInput.value = '15000';
+    else nomInput.value = '50000';
+  }
+
+  function handleSaveBayarIuran() {
+    var payload = {
+      noKuitansi: document.getElementById('bayarNoKuitansi').value,
+      noKk: currentUser ? currentUser.noKk : '',
+      namaWarga: document.getElementById('bayarNamaWarga').value,
+      jenisIuran: document.getElementById('bayarJenisIuran').value,
+      bulanTahun: document.getElementById('bayarBulanTahun').value,
+      tanggalBayar: document.getElementById('bayarTanggal').value,
+      nominal: document.getElementById('bayarNominal').value
+    };
+
+    var btn = document.getElementById('btnSubmitBayarIuran');
+    btn.disabled = true;
+    btn.innerText = 'Mengirim...';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(function(res) {
+        btn.disabled = false;
+        btn.innerText = 'Kirim Pembayaran';
+        closeModal('modalBayarIuran');
+        if (res && res.success) {
+          showToast(res.message, 'success');
+          fetchIuranData(0);
+          refreshData();
+        } else {
+          showToast(res ? res.message : 'Gagal.', 'error');
+        }
+      }).submitBayarIuran(payload);
+    } else {
+      setTimeout(function() {
+        btn.disabled = false;
+        btn.innerText = 'Kirim Pembayaran';
+        closeModal('modalBayarIuran');
+        showToast('Pembayaran berhasil dikirim! Status: Menunggu', 'success');
+        fetchIuranData(0);
+        refreshData();
+      }, 400);
+    }
+  }
+
+  function debounceFetchIuran() {
+    clearTimeout(debounceTimerIuran);
+    debounceTimerIuran = setTimeout(function() { fetchIuranData(0); }, 350);
+  }
+
+  function fetchIuranData(offset) {
+    offset = offset || 0;
+    var status = document.getElementById('filterIuranStatus').value;
+    var jenis = document.getElementById('filterIuranJenis').value;
+    var search = document.getElementById('filterIuranSearch').value;
+    var params = {
+      limit: 10,
+      offset: offset,
+      statusBayar: status,
+      jenisIuran: jenis,
+      search: search,
+      role: currentUser ? currentUser.role : 'Warga',
+      noKk: currentUser ? currentUser.noKk : ''
+    };
+
+    var tbody = document.getElementById('iuranTableBody');
+    tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat data iuran...</td></tr>';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(function(res) {
+        if (res && res.success) renderIuranTable(res);
+      }).getIuranList(params);
+    } else {
+      setTimeout(function() {
+        var dummyData = [
+          { idIuran: 'IUR-0001', noKuitansi: '2026090101', namaWarga: 'Budi Santoso', noKk: '3171010000000001', bulanTahun: 'September 2026', jenisIuran: 'Iuran Kas', nominal: '50000', statusBayar: 'Sudah bayar', approvedBy: 'Siti Rahmawati' },
+          { idIuran: 'IUR-0003', noKuitansi: '2026090103', namaWarga: 'Agus Setiawan', noKk: '3171010000000003', bulanTahun: 'September 2026', jenisIuran: 'Iuran Sampah', nominal: '25000', statusBayar: 'Menunggu', approvedBy: '-' }
+        ];
+        if (currentUser && currentUser.role === 'Warga') {
+          dummyData = dummyData.filter(function(x) { return x.noKk === currentUser.noKk; });
+        }
+        renderIuranTable({ data: dummyData, total: dummyData.length, page: 1, totalPages: 1 });
+      }, 300);
+    }
+  }
+
+  function renderIuranTable(res) {
+    var tbody = document.getElementById('iuranTableBody');
+    tbody.innerHTML = '';
+    if (!res.data || res.data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400">Tidak ada data iuran.</td></tr>';
+      document.getElementById('iuranPaginationInfo').innerText = 'Menampilkan 0 data';
+      document.getElementById('iuranPaginationBtns').innerHTML = '';
+      return;
+    }
+
+    var isPengurus = currentUser && (
+      currentUser.role === 'Super Admin' ||
+      currentUser.role === 'Pengurus RT' ||
+      currentUser.role === 'Ketua RT' ||
+      currentUser.role === 'Bendahara' ||
+      currentUser.role === 'Sekretaris' ||
+      currentUser.statusUser === 'Pengurus RT'
+    );
+
+    for (var i = 0; i < res.data.length; i++) {
+      var row = res.data[i];
+      var tr = document.createElement('tr');
+      tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+
+      var st = (row.statusBayar || '').trim();
+      var isMenunggu = (st === 'Menunggu' || st === 'Menunggu Approval');
+
+      var statusBadge = '';
+      if (st === 'Sudah bayar' || st === 'Lunas') {
+        statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800"><i class="fa-solid fa-circle-check mr-1"></i>Sudah bayar</span>';
+      } else if (isMenunggu) {
+        statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 animate-pulse"><i class="fa-solid fa-clock mr-1"></i>Menunggu</span>';
+      } else if (st === 'Ditolak') {
+        statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800"><i class="fa-solid fa-circle-xmark mr-1"></i>Ditolak</span>';
+      } else {
+        statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700"><i class="fa-solid fa-circle-minus mr-1"></i>Belum Bayar</span>';
+      }
+
+      var actionBtns = '-';
+      if (isPengurus && isMenunggu) {
+        actionBtns = '<div class="flex items-center justify-center gap-1.5">' +
+          '<button onclick="handleApproveIuran(\'' + row.idIuran + '\', \'APPROVE\')" class="p-1 px-2.5 rounded-lg bg-emerald-600 text-white font-bold text-[10px] shadow hover:bg-emerald-700 transition flex items-center gap-1"><i class="fa-solid fa-check"></i> Diterima</button>' +
+          '<button onclick="handleApproveIuran(\'' + row.idIuran + '\', \'REJECT\')" class="p-1 px-2 rounded-lg bg-rose-100 text-rose-600 font-bold text-[10px] hover:bg-rose-200 transition flex items-center gap-1"><i class="fa-solid fa-xmark"></i> Ditolak</button>' +
+          '</div>';
+      }
+
+      tr.innerHTML = 
+        '<td class="p-3.5"><p class="font-mono font-bold text-brand-indigo text-[11px]"><i class="fa-solid fa-ticket mr-1"></i>' + (row.noKuitansi || '-') + '</p><p class="font-semibold text-slate-800">' + row.namaWarga + '</p></td>' +
+        '<td class="p-3.5"><p class="font-bold text-slate-700">' + row.jenisIuran + '</p><p class="text-[10px] text-slate-400">' + row.bulanTahun + '</p></td>' +
+        '<td class="p-3.5 font-black text-slate-800">' + formatRupiah(row.nominal) + '</td>' +
+        '<td class="p-3.5">' + statusBadge + '</td>' +
+        '<td class="p-3.5 text-slate-500 text-[11px]">' + (row.approvedBy || '-') + '</td>' +
+        '<td class="p-3.5 text-center">' + actionBtns + '</td>';
+      tbody.appendChild(tr);
+    }
+    document.getElementById('iuranPaginationInfo').innerText = 'Halaman ' + res.page + ' dari ' + res.totalPages;
+    renderPaginationButtons('iuranPaginationBtns', res.page, res.totalPages, 'fetchIuranData');
+  }
+
+  function handleApproveIuran(idIuran, action) {
+    var approver = currentUser ? currentUser.nama : 'Pengurus RT';
+    var actionLabel = action === 'APPROVE' ? 'DITERIMA' : 'DITOLAK';
+    showToast('Memproses verifikasi (' + actionLabel + ')...', 'info');
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(function(res) {
+        if (res && res.success) {
+          showToast(res.message, 'success');
+          fetchIuranData(0);
+          refreshData();
+        } else {
+          showToast(res ? res.message : 'Gagal.', 'error');
+        }
+      }).approveIuran(idIuran, approver, action);
+    } else {
+      setTimeout(function() {
+        showToast('Pembayaran iuran berhasil diverifikasi: ' + actionLabel, 'success');
+        fetchIuranData(0);
+        refreshData();
+      }, 400);
+    }
+  }
+
+  function openModalExportPdfLaporan() {
+    document.getElementById('pdfFilterJenis').value = 'SEMUA';
+    generatePdfPrintPreview();
+    document.getElementById('modalExportPdfLaporan').classList.remove('hidden');
+  }
+
+  function generatePdfPrintPreview() {
+    var jenis = document.getElementById('pdfFilterJenis').value;
+    var tbody = document.getElementById('pdfReportTbody');
+    tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Menyiapkan Laporan Keuangan...</td></tr>';
+
+    var dateNow = new Date();
+    var dayStr = ('0' + dateNow.getDate()).slice(-2);
+    var monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    document.getElementById('pdfPrintDate').innerText = dayStr + ' ' + monthNames[dateNow.getMonth()] + ' ' + dateNow.getFullYear();
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(function(res) {
+        if (res && res.success) renderPdfReportContent(res);
+      }).getLaporanKeuanganData(jenis);
+    } else {
+      setTimeout(function() {
+        renderPdfReportContent({
+          data: [
+            { noKuitansi: '2026090101', namaWarga: 'Budi Santoso', jenisIuran: 'Iuran Kas', bulanTahun: 'September 2026', nominal: 50000, tanggalBayar: '01/09/2026' },
+            { noKuitansi: '2026090102', namaWarga: 'Budi Santoso', jenisIuran: 'Iuran Duka', bulanTahun: 'September 2026', nominal: 20000, tanggalBayar: '01/09/2026' }
+          ],
+          totalNominal: 70000
+        });
+      }, 300);
+    }
+  }
+
+  function renderPdfReportContent(res) {
+    var tbody = document.getElementById('pdfReportTbody');
+    tbody.innerHTML = '';
+    document.getElementById('pdfReportTotal').innerText = formatRupiah(res.totalNominal || 0);
+
+    if (!res.data || res.data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400 border border-slate-300">Belum ada transaksi iuran yang terverifikasi untuk kategori ini.</td></tr>';
+      return;
+    }
+
+    for (var i = 0; i < res.data.length; i++) {
+      var d = res.data[i];
+      var tr = document.createElement('tr');
+      tr.className = 'border-b border-slate-200';
+      tr.innerHTML = 
+        '<td class="p-2 border border-slate-300 font-mono font-bold text-slate-900">' + d.noKuitansi + '</td>' +
+        '<td class="p-2 border border-slate-300 font-semibold text-slate-800">' + d.namaWarga + '</td>' +
+        '<td class="p-2 border border-slate-300 text-slate-700">' + d.jenisIuran + '</td>' +
+        '<td class="p-2 border border-slate-300 text-slate-600">' + d.bulanTahun + '</td>' +
+        '<td class="p-2 border border-slate-300 text-right font-bold text-slate-900">' + formatRupiah(d.nominal) + '</td>' +
+        '<td class="p-2 border border-slate-300 text-center text-slate-500 text-[10px]">' + (d.tanggalBayar || '-') + '</td>';
+      tbody.appendChild(tr);
+    }
+  }
+
+  function triggerPrintPdf() {
+    window.print();
+  }
+</script>
