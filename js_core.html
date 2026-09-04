@@ -217,6 +217,12 @@
         if (isPengurus) btnTambahAset.classList.remove('hidden');
         else btnTambahAset.classList.add('hidden');
       }
+
+      var btnKelolaRonda = document.getElementById('btnKelolaRondaContainer');
+      if (btnKelolaRonda) {
+        if (isPengurus) btnKelolaRonda.classList.remove('hidden');
+        else btnKelolaRonda.classList.add('hidden');
+      }
     }
 
     switchTab('dashboard');
@@ -225,7 +231,7 @@
 
   function switchTab(tabId) {
     currentTab = tabId;
-    var tabs = ['dashboard', 'warga', 'iuran', 'keluarga', 'mading', 'aset'];
+    var tabs = ['dashboard', 'warga', 'iuran', 'keluarga', 'mading', 'aset', 'ronda'];
     for (var i = 0; i < tabs.length; i++) {
       var t = tabs[i];
       var view = document.getElementById('tab-' + t);
@@ -240,9 +246,6 @@
       }
     }
 
-    // KONTROL TAMPILAN BANNER GREETING DI HANDPHONE
-    // Jika berada di Dashboard, tampilkan di semua perangkat.
-    // Jika membuka sub-menu selain Dashboard, sembunyikan di layar HP (tetap tampil di desktop).
     var gBanner = document.getElementById('greetingBanner');
     if (gBanner) {
       if (tabId === 'dashboard') {
@@ -268,6 +271,8 @@
     } else if (tabId === 'aset') {
       fetchAsetData();
       fetchPeminjamanData();
+    } else if (tabId === 'ronda') {
+      fetchRondaSchedules();
     }
   }
 
