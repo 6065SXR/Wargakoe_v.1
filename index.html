@@ -387,7 +387,6 @@
             </div>
           </div>
 
-          <!-- KAS TERKUMPUL: Murni menghitung total dari Iuran Kas saja -->
           <div class="dashboard-card p-4 flex items-center gap-3.5 border-l-4 border-l-emerald-500">
             <div class="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-lg">
               <i class="fa-solid fa-vault"></i>
@@ -825,7 +824,11 @@
   </div>
 
   <?!= include('modals'); ?>
-  <?!= include('js'); ?>
+  <?!= include('js_core'); ?>
+  <?!= include('js_dashboard'); ?>
+  <?!= include('js_iuran'); ?>
+  <?!= include('js_warga'); ?>
+  <?!= include('js_keluarga_mading'); ?>
 
 </body>
 </html>
