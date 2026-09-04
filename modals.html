@@ -308,9 +308,6 @@
   </div>
 </div>
 
-<!-- ==================================================================== -->
-<!-- MODAL BARU: PINJAM ASET WARGA -->
-<!-- ==================================================================== -->
 <div id="modalPinjamAset" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
   <div class="dashboard-card w-full max-w-md p-6 relative">
     <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
@@ -367,9 +364,6 @@
   </div>
 </div>
 
-<!-- ==================================================================== -->
-<!-- MODAL BARU: TAMBAH / EDIT ASET RT (PENGURUS ONLY) -->
-<!-- ==================================================================== -->
 <div id="modalKelolaAset" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
   <div class="dashboard-card w-full max-w-md p-6 relative">
     <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
@@ -434,9 +428,6 @@
   </div>
 </div>
 
-<!-- ==================================================================== -->
-<!-- MODAL BARU: AKSI VERIFIKASI PEMINJAMAN (SETUJUI, TOLAK, KEMBALI) -->
-<!-- ==================================================================== -->
 <div id="modalAksiPeminjaman" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
   <div class="dashboard-card w-full max-w-md p-6 relative">
     <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
@@ -468,6 +459,159 @@
           Proses Sekarang
         </button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================================================================== -->
+<!-- MODAL BARU 1: KELOLA REGULER JADWAL RONDA (ROLE PENGURUS RT) -->
+<!-- ==================================================================== -->
+<div id="modalKelolaRonda" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+  <div class="dashboard-card w-full max-w-lg p-6 relative max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+      <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2" id="modalKelolaRondaTitle">
+        <i class="fa-solid fa-shield-halved text-brand-indigo"></i>
+        <span>Atur Regu &amp; Penjadwalan Ronda Malam Minggu</span>
+      </h3>
+      <button onclick="closeModal('modalKelolaRonda')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-base"></i></button>
+    </div>
+
+    <form id="formKelolaRonda" onsubmit="event.preventDefault(); handleSaveKelolaRonda();" class="space-y-3.5 text-xs">
+      <input type="hidden" id="formRondaId" value="">
+
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Nama Regu Ronda</label>
+          <input type="text" id="formRondaNamaRegu" required placeholder="Contoh: Regu Alpha (Pos 1)" class="input-pill w-full">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Tanggal Ronda (Sabtu)</label>
+          <input type="date" id="formRondaTanggal" required class="input-pill w-full font-bold text-brand-indigo" onchange="validateRondaSaturday(this)">
+          <p class="text-[9px] text-amber-600 mt-1 font-semibold">* Diutamakan Hari Sabtu / Malam Minggu</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Ketua Regu Ronda</label>
+          <input type="text" id="formRondaKetua" required placeholder="Nama Ketua Regu" class="input-pill w-full font-bold">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Jam Shift Ronda</label>
+          <input type="text" id="formRondaJamShift" required value="22.00 - 03.00 WIB" class="input-pill w-full">
+        </div>
+      </div>
+
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Lokasi Titik Pos Ronda</label>
+        <input type="text" id="formRondaLokasiPos" required value="Pos Ronda Utama RT 010 RW 05" class="input-pill w-full">
+      </div>
+
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Pilih Anggota Warga Dalam Regu Ini</label>
+        <div id="formRondaWargaCheckboxes" class="p-3 bg-slate-50 rounded-2xl border border-slate-200 max-h-40 overflow-y-auto space-y-1.5">
+          <!-- Checkbox warga dirender otomatis lewat JS -->
+        </div>
+      </div>
+
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Catatan Tambahan Pengurus</label>
+        <textarea id="formRondaCatatan" rows="2" placeholder="Contoh: Bawa senter, kentongan, & patroli per gang tiap 1 jam..." class="w-full p-3 rounded-2xl border border-slate-200 outline-none focus:border-brand-amber text-xs"></textarea>
+      </div>
+
+      <div class="pt-3 flex items-center justify-end gap-2">
+        <button type="button" onclick="closeModal('modalKelolaRonda')" class="px-4 py-2.5 rounded-full border border-slate-200 text-slate-600 font-bold">Batal</button>
+        <button type="submit" id="btnSaveKelolaRonda" class="px-5 py-2.5 rounded-full bg-brand-indigo text-white font-bold shadow-md hover:opacity-95">Simpan Penjadwalan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ==================================================================== -->
+<!-- MODAL BARU 2: ABSENSI SELFIE KAMERA DEPAN WARGA -->
+<!-- ==================================================================== -->
+<div id="modalAbsenRonda" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md">
+  <div class="dashboard-card w-full max-w-sm p-5 relative bg-brand-dark text-white border border-white/20">
+    <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-full bg-brand-neon text-brand-dark font-black flex items-center justify-center text-xs">
+          <i class="fa-solid fa-camera"></i>
+        </div>
+        <div>
+          <h3 class="text-xs font-extrabold text-white">Absensi Selfie Ronda Malam</h3>
+          <p class="text-[9px] text-brand-neon font-mono" id="absenRondaTitleRegu">Regu Alpha • Pos Ronda</p>
+        </div>
+      </div>
+      <button onclick="closeModalAbsenRonda()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-base"></i></button>
+    </div>
+
+    <div class="space-y-3 text-xs">
+      <input type="hidden" id="absenRondaIdJadwal" value="">
+      <input type="hidden" id="absenRondaTanggal" value="">
+
+      <!-- AREA KAMERA & SELFIE PREVIEW -->
+      <div class="relative w-full aspect-square bg-black rounded-2xl overflow-hidden border-2 border-white/20 flex items-center justify-center shadow-inner">
+        <video id="selfieVideoFeed" autoplay playsinline class="w-full h-full object-cover transform -scale-x-100"></video>
+        <canvas id="selfieCanvas" class="hidden w-full h-full object-cover"></canvas>
+        
+        <!-- Overlay garis pemandu selfie -->
+        <div id="selfieGuideOverlay" class="absolute inset-0 pointer-events-none border-2 border-dashed border-brand-neon/40 rounded-2xl m-6 flex items-center justify-center">
+          <span class="text-[10px] bg-black/60 text-brand-neon px-2 py-0.5 rounded-full font-mono">Posisikan Wajah</span>
+        </div>
+      </div>
+
+      <!-- FALLBACK OPSI JIKA KAMERA WEB DIRETAK ATAU AKSES DITOLAK -->
+      <div class="text-center">
+        <input type="file" id="selfieFileInput" accept="image/*" capture="user" onchange="handleSelfieFileFallback(event)" class="hidden">
+        <button type="button" onclick="document.getElementById('selfieFileInput').click()" class="text-[10px] text-slate-400 hover:text-brand-neon underline">
+          <i class="fa-solid fa-image mr-1"></i>Kamera Bermasalah? Ambil/Pilih Foto Selfie Manual
+        </button>
+      </div>
+
+      <div class="p-2.5 rounded-xl bg-white/5 border border-white/10 space-y-0.5 text-[10px] text-slate-300">
+        <p><strong>Nama Warga:</strong> <span id="absenWargaNama" class="text-white font-bold">-</span></p>
+        <p><strong>Waktu Presensi:</strong> <span id="absenWargaTime" class="text-brand-neon font-mono">-</span></p>
+      </div>
+
+      <div class="pt-2 flex items-center justify-between gap-2">
+        <button type="button" id="btnRetakeSelfie" onclick="resetSelfieCamera()" class="hidden px-4 py-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex-1 transition">
+          <i class="fa-solid fa-rotate-left mr-1"></i>Ulangi Foto
+        </button>
+        <button type="button" id="btnCaptureSelfie" onclick="takeSelfieSnapshot()" class="w-full py-3 rounded-full bg-gradient-to-r from-brand-neon to-emerald-400 text-brand-dark font-black text-xs shadow-lg hover:opacity-95 transition flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-circle-dot"></i>
+          <span>Ambil Foto Selfie</span>
+        </button>
+        <button type="button" id="btnSubmitSelfieAbsen" onclick="submitSelfieAttendance()" class="hidden w-full py-3 rounded-full bg-gradient-to-r from-brand-amber to-brand-pink text-white font-black text-xs shadow-lg hover:opacity-95 transition flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-paper-plane"></i>
+          <span>Kirim Absensi Ronda</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================================================================== -->
+<!-- MODAL BARU 3: REKAP MONITORING ABSENSI SELFIE (ROLE PENGURUS RT) -->
+<!-- ==================================================================== -->
+<div id="modalRekapAbsenRonda" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+  <div class="dashboard-card w-full max-w-2xl p-6 relative bg-white max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+      <div>
+        <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+          <i class="fa-solid fa-id-card-clip text-brand-indigo"></i>
+          <span>Rekap Absensi Selfie Pos Ronda</span>
+        </h3>
+        <p class="text-[11px] text-slate-500" id="rekapRondaSubtitle">Regu Alpha • Tanggal 2026-09-05</p>
+      </div>
+      <button onclick="closeModal('modalRekapAbsenRonda')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-base"></i></button>
+    </div>
+
+    <div id="rekapAbsenGridContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+
+    <div class="pt-4 flex items-center justify-end">
+      <button type="button" onclick="closeModal('modalRekapAbsenRonda')" class="px-5 py-2 rounded-full border border-slate-200 text-slate-600 font-bold text-xs">
+        Tutup
+      </button>
     </div>
   </div>
 </div>
