@@ -281,10 +281,10 @@
             <span id="badgeAsetPendingDesktop" class="hidden ml-auto px-2 py-0.5 text-[10px] font-bold rounded-full bg-rose-500 text-white animate-pulse">0</span>
           </button>
 
-          <!-- MENU PREVIEW RONDA DI SIDEBAR DESKTOP -->
-          <button onclick="showToast('Fitur Jadwal Ronda sedang dipersiapkan.', 'info')" id="sideNav-ronda" class="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all-300">
+          <button onclick="switchTab('ronda')" id="sideNav-ronda" class="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all-300 relative">
             <i class="fa-solid fa-shield-halved w-4 text-center text-violet-400"></i>
             <span>Jadwal Ronda</span>
+            <span id="badgeRondaActiveDesktop" class="hidden ml-auto w-2.5 h-2.5 rounded-full bg-brand-neon animate-ping"></span>
           </button>
 
           <button onclick="switchTab('keluarga')" id="sideNav-keluarga" class="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all-300">
@@ -340,7 +340,7 @@
     <!-- MAIN CONTENT -->
     <main class="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full pb-8">
 
-      <!-- GREETING BANNER DENGAN ID (DIKONTROL JS AGAR HANYA MUNCUL DI DASHBOARD SAAT DI HP) -->
+      <!-- GREETING BANNER DENGAN ID -->
       <div id="greetingBanner" class="mb-5 rounded-3xl p-5 sm:p-6 bg-gradient-to-r from-brand-amber via-brand-pink to-brand-indigo text-white shadow-xl relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div class="relative z-10">
           <span class="text-[10px] sm:text-xs font-bold tracking-wider uppercase bg-white/20 px-3 py-1 rounded-full backdrop-blur-md">
@@ -357,7 +357,32 @@
         </div>
       </div>
 
-      <!-- NOTIFIKASI KHUSUS PENGURUS RT: PENGAJUAN ASET MENUNGGU PERSETUJUAN -->
+      <!-- BANNER NOTIFIKASI RONDA MALAM MINGGU WARGA -->
+      <div id="wargaRondaNotificationBanner" class="hidden mb-5 p-4 rounded-3xl bg-gradient-to-r from-violet-600 to-brand-indigo text-white shadow-lg relative overflow-hidden">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative z-10">
+          <div class="flex items-start gap-3">
+            <div class="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md text-brand-neon flex items-center justify-center text-xl flex-shrink-0 shadow-inner">
+              <i class="fa-solid fa-shield-halved animate-bounce"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-brand-neon text-brand-dark" id="rondaBannerBadge">Malam Minggu</span>
+                <span class="text-[10px] text-violet-200 font-mono" id="rondaBannerDate">2026-09-05</span>
+              </div>
+              <h4 class="text-sm font-bold text-white mt-1" id="rondaBannerTitle">Pengingat Jadwal Ronda Malam Minggu Anda</h4>
+              <p class="text-xs text-violet-100 mt-0.5" id="rondaBannerDesc">Anda terdaftar di Regu Alpha bersama 3 warga lainnya.</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <button onclick="switchTab('ronda')" class="w-full sm:w-auto px-5 py-2.5 rounded-full bg-brand-neon text-brand-dark font-extrabold text-xs shadow-md hover:bg-emerald-300 transition flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-camera font-bold"></i>
+              <span id="rondaBannerBtnText">Lihat Regu & Absen Selfie</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- NOTIFIKASI KHUSUS PENGURUS RT -->
       <div id="pengurusAsetPendingBanner" class="hidden mb-5 p-4 rounded-3xl bg-indigo-500/10 border-2 border-brand-indigo text-slate-800 shadow-md">
         <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div class="flex items-start gap-3">
@@ -381,7 +406,6 @@
       <!-- ======================================================= -->
       <div id="tab-dashboard" class="space-y-5">
         
-        <!-- MENU NAVIGASI GRID DI DASHBOARD (LEBIH RINGKAS & MENARIK) -->
         <div class="dashboard-card p-4 sm:p-5">
           <div class="flex items-center justify-between mb-3">
             <h3 class="text-xs sm:text-sm font-bold text-slate-800 flex items-center gap-2">
@@ -392,7 +416,6 @@
           </div>
 
           <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3">
-            <!-- 1. Data Warga -->
             <button type="button" onclick="switchTab('warga')" class="flex flex-col items-center justify-center p-3 sm:p-3.5 rounded-2xl bg-slate-50 hover:bg-indigo-50/60 border border-slate-200/80 hover:border-brand-indigo/30 transition-all duration-200 group text-center active:scale-95">
               <div class="w-10 h-10 rounded-xl bg-indigo-100 text-brand-indigo flex items-center justify-center text-base mb-1.5 group-hover:scale-105 transition-transform">
                 <i class="fa-solid fa-address-book"></i>
@@ -401,7 +424,6 @@
               <span class="text-[10px] text-slate-400 mt-0.5">Daftar warga RT</span>
             </button>
 
-            <!-- 2. Iuran & Kas RT -->
             <button type="button" onclick="switchTab('iuran')" class="flex flex-col items-center justify-center p-3 sm:p-3.5 rounded-2xl bg-slate-50 hover:bg-emerald-50/60 border border-slate-200/80 hover:border-emerald-50/30 transition-all duration-200 group text-center active:scale-95">
               <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-base mb-1.5 group-hover:scale-105 transition-transform">
                 <i class="fa-solid fa-money-bill-wave"></i>
@@ -410,7 +432,6 @@
               <span class="text-[10px] text-slate-400 mt-0.5">Iuran &amp; kas RT</span>
             </button>
 
-            <!-- 3. Aset Warga -->
             <button type="button" onclick="switchTab('aset')" class="flex flex-col items-center justify-center p-3 sm:p-3.5 rounded-2xl bg-slate-50 hover:bg-amber-50/60 border border-slate-200/80 hover:border-brand-amber/30 transition-all duration-200 group text-center relative active:scale-95">
               <span id="badgeAsetPendingMobile" class="hidden absolute top-2 right-2 px-1.5 py-0.5 text-[8px] font-black rounded-full bg-rose-500 text-white animate-pulse">Baru</span>
               <div class="w-10 h-10 rounded-xl bg-amber-100 text-brand-amber flex items-center justify-center text-base mb-1.5 group-hover:scale-105 transition-transform">
@@ -420,8 +441,7 @@
               <span class="text-[10px] text-slate-400 mt-0.5">Pinjam barang</span>
             </button>
 
-            <!-- 4. JADWAL RONDA (UI PREVIEW ONLY) -->
-            <button type="button" onclick="showToast('Menu Jadwal Ronda (Preview Tampilan)', 'info')" class="flex flex-col items-center justify-center p-3 sm:p-3.5 rounded-2xl bg-slate-50 hover:bg-violet-50/60 border border-slate-200/80 hover:border-violet-300 transition-all duration-200 group text-center active:scale-95">
+            <button type="button" onclick="switchTab('ronda')" class="flex flex-col items-center justify-center p-3 sm:p-3.5 rounded-2xl bg-slate-50 hover:bg-violet-50/60 border border-slate-200/80 hover:border-violet-300 transition-all duration-200 group text-center active:scale-95">
               <div class="w-10 h-10 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center text-base mb-1.5 group-hover:scale-105 transition-transform">
                 <i class="fa-solid fa-shield-halved"></i>
               </div>
@@ -429,7 +449,6 @@
               <span class="text-[10px] text-slate-400 mt-0.5">Malam Minggu</span>
             </button>
 
-            <!-- 5. Keluarga Saya -->
             <button type="button" onclick="switchTab('keluarga')" class="flex flex-col items-center justify-center p-3 sm:p-3.5 rounded-2xl bg-slate-50 hover:bg-pink-50/60 border border-slate-200/80 hover:border-brand-pink/30 transition-all duration-200 group text-center active:scale-95">
               <div class="w-10 h-10 rounded-xl bg-pink-100 text-brand-pink flex items-center justify-center text-base mb-1.5 group-hover:scale-105 transition-transform">
                 <i class="fa-solid fa-house-user"></i>
@@ -438,7 +457,6 @@
               <span class="text-[10px] text-slate-400 mt-0.5">Data KK saya</span>
             </button>
 
-            <!-- 6. Informasi Mading -->
             <button type="button" onclick="switchTab('mading')" class="flex flex-col items-center justify-center p-3 sm:p-3.5 rounded-2xl bg-slate-50 hover:bg-cyan-50/60 border border-slate-200/80 hover:border-brand-cyan/30 transition-all duration-200 group text-center active:scale-95">
               <div class="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-700 flex items-center justify-center text-base mb-1.5 group-hover:scale-105 transition-transform">
                 <i class="fa-solid fa-bullhorn"></i>
@@ -449,7 +467,6 @@
           </div>
         </div>
 
-        <!-- UNPAID DUES REMINDER NOTIF BANNER -->
         <div id="wargaPendingBanner" class="hidden p-4 rounded-3xl bg-amber-500/10 border-2 border-brand-amber text-slate-800 shadow-md">
           <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div class="flex items-start gap-3">
@@ -468,7 +485,6 @@
           </div>
         </div>
 
-        <!-- STATISTIK DASAR -->
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div class="dashboard-card p-4 flex items-center gap-3.5 border-l-4 border-l-brand-amber">
             <div class="w-11 h-11 rounded-2xl bg-brand-amber/10 text-brand-amber flex items-center justify-center text-lg">
@@ -617,11 +633,8 @@
 
       </div>
 
-      <!-- ======================================================= -->
-      <!-- TAB 2: DATA WARGA                                       -->
-      <!-- ======================================================= -->
+      <!-- TAB 2: DATA WARGA -->
       <div id="tab-warga" class="hidden space-y-4">
-        <!-- TOMBOL KEMBALI KE DASHBOARD (EYE-CATCHING) -->
         <div class="md:hidden mb-1">
           <button type="button" onclick="switchTab('dashboard')" class="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-gradient-to-r from-brand-indigo to-indigo-800 text-white text-xs font-bold shadow-md shadow-brand-indigo/30 hover:shadow-lg active:scale-95 transition-all border border-white/20">
             <i class="fa-solid fa-arrow-left-long text-brand-neon text-sm"></i>
@@ -696,11 +709,8 @@
         </div>
       </div>
 
-      <!-- ======================================================= -->
-      <!-- TAB 3: IURAN & KAS RT (DIPADUKAN DENGAN DETAIL KAS RT) -->
-      <!-- ======================================================= -->
+      <!-- TAB 3: IURAN & KAS RT -->
       <div id="tab-iuran" class="hidden space-y-6">
-        <!-- TOMBOL KEMBALI KE DASHBOARD (EYE-CATCHING) -->
         <div class="md:hidden mb-1">
           <button type="button" onclick="switchTab('dashboard')" class="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-gradient-to-r from-brand-indigo to-indigo-800 text-white text-xs font-bold shadow-md shadow-brand-indigo/30 hover:shadow-lg active:scale-95 transition-all border border-white/20">
             <i class="fa-solid fa-arrow-left-long text-brand-neon text-sm"></i>
@@ -708,7 +718,6 @@
           </button>
         </div>
 
-        <!-- 1. MANAJEMEN PEMBAYARAN IURAN WARGA -->
         <div class="dashboard-card p-5">
           <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-4">
             <div>
@@ -774,7 +783,6 @@
           </div>
         </div>
 
-        <!-- 2. DETAIL RINCIAN SALDO KAS RT 010 -->
         <div class="dashboard-card p-5">
           <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
             <div>
@@ -863,11 +871,8 @@
 
       </div>
 
-      <!-- ======================================================= -->
-      <!-- TAB 4: ASET WARGA & PEMINJAMAN INVENTARIS RT           -->
-      <!-- ======================================================= -->
+      <!-- TAB 4: ASET WARGA -->
       <div id="tab-aset" class="hidden space-y-6">
-        <!-- TOMBOL KEMBALI KE DASHBOARD (EYE-CATCHING) -->
         <div class="md:hidden mb-1">
           <button type="button" onclick="switchTab('dashboard')" class="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-gradient-to-r from-brand-indigo to-indigo-800 text-white text-xs font-bold shadow-md shadow-brand-indigo/30 hover:shadow-lg active:scale-95 transition-all border border-white/20">
             <i class="fa-solid fa-arrow-left-long text-brand-neon text-sm"></i>
@@ -896,7 +901,6 @@
             </div>
           </div>
 
-          <!-- KATALOG ASET -->
           <div class="mt-4">
             <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3 flex items-center gap-2">
               <i class="fa-solid fa-boxes-stacked text-brand-amber"></i>
@@ -906,7 +910,6 @@
           </div>
         </div>
 
-        <!-- RIWAYAT & DAFTAR PERMOHONAN PINJAM -->
         <div class="dashboard-card p-5">
           <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
             <div>
@@ -947,10 +950,51 @@
       </div>
 
       <!-- ======================================================= -->
-      <!-- TAB 5: KELUARGA SAYA                                    -->
+      <!-- TAB 5: JADWAL RONDA MALAM MINGGU                       -->
       <!-- ======================================================= -->
+      <div id="tab-ronda" class="hidden space-y-6">
+        <div class="md:hidden mb-1">
+          <button type="button" onclick="switchTab('dashboard')" class="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-gradient-to-r from-brand-indigo to-indigo-800 text-white text-xs font-bold shadow-md shadow-brand-indigo/30 hover:shadow-lg active:scale-95 transition-all border border-white/20">
+            <i class="fa-solid fa-arrow-left-long text-brand-neon text-sm"></i>
+            <span>Kembali ke Dashboard</span>
+          </button>
+        </div>
+
+        <div class="dashboard-card p-5">
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-4">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-violet-100 text-violet-800 uppercase">Khusus Sabtu / Malam Minggu</span>
+                <span class="text-xs text-slate-400 font-mono">RT 010 / RW 05</span>
+              </div>
+              <h3 class="text-lg font-bold text-slate-800 mt-1">Sistem Jadwal Ronda &amp; Absensi Selfie</h3>
+              <p class="text-xs text-slate-500">Pembagian regu ronda, pengingat jadwal, serta rekap hadir warga di pos</p>
+            </div>
+            
+            <div id="btnKelolaRondaContainer" class="hidden">
+              <button onclick="openModalKelolaRonda()" class="px-4 py-2.5 rounded-full bg-brand-indigo text-white text-xs font-bold shadow-md hover:opacity-95 transition flex items-center gap-1.5">
+                <i class="fa-solid fa-user-gear"></i>
+                <span>Atur Regu Ronda Baru</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- KARTU JADWAL RONDA TERAKHIR SAYA (UNTUK ROLE WARGA) -->
+          <div id="wargaMyRondaCardContainer" class="mb-6"></div>
+
+          <!-- LIST REGULER JADWAL RONDA RT 010 -->
+          <div>
+            <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <i class="fa-solid fa-list-check text-brand-amber"></i>
+              <span>Daftar Regu Ronda Malam Minggu RT 010</span>
+            </h4>
+            <div id="rondaSchedulesListContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 6: KELUARGA SAYA -->
       <div id="tab-keluarga" class="hidden space-y-6">
-        <!-- TOMBOL KEMBALI KE DASHBOARD (EYE-CATCHING) -->
         <div class="md:hidden mb-1">
           <button type="button" onclick="switchTab('dashboard')" class="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-gradient-to-r from-brand-indigo to-indigo-800 text-white text-xs font-bold shadow-md shadow-brand-indigo/30 hover:shadow-lg active:scale-95 transition-all border border-white/20">
             <i class="fa-solid fa-arrow-left-long text-brand-neon text-sm"></i>
@@ -989,11 +1033,8 @@
         </div>
       </div>
 
-      <!-- ======================================================= -->
-      <!-- TAB 6: MADING PENGUMUMAN                                -->
-      <!-- ======================================================= -->
+      <!-- TAB 7: MADING PENGUMUMAN -->
       <div id="tab-mading" class="hidden space-y-4">
-        <!-- TOMBOL KEMBALI KE DASHBOARD (EYE-CATCHING) -->
         <div class="md:hidden mb-1">
           <button type="button" onclick="switchTab('dashboard')" class="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-gradient-to-r from-brand-indigo to-indigo-800 text-white text-xs font-bold shadow-md shadow-brand-indigo/30 hover:shadow-lg active:scale-95 transition-all border border-white/20">
             <i class="fa-solid fa-arrow-left-long text-brand-neon text-sm"></i>
@@ -1037,6 +1078,7 @@
   <?!= include('js_warga'); ?>
   <?!= include('js_keluarga_mading'); ?>
   <?!= include('js_aset'); ?>
+  <?!= include('js_ronda'); ?>
 
 </body>
 </html>
