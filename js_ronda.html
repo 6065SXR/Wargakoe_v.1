@@ -1,0 +1,634 @@
+<script>
+  var currentRondaMasterList = [];
+  var currentWargaSelectionList = [];
+  var selfieMediaStream = null;
+  var capturedSelfieBase64 = '';
+
+  function fetchRondaSchedules() {
+    var container = document.getElementById('rondaSchedulesListContainer');
+    if (!container) return;
+    container.innerHTML = '<div class="col-span-full p-6 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat jadwal ronda malam minggu...</div>';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success) {
+            currentRondaMasterList = res.data || [];
+            renderRondaCards(currentRondaMasterList);
+            checkMyRondaAssignment(currentRondaMasterList);
+          }
+        })
+        .getJadwalRondaList();
+    } else {
+      setTimeout(function() {
+        currentRondaMasterList = [
+          {
+            idJadwal: 'RND-0001',
+            namaRegu: 'Regu Alpha (Pos Utama)',
+            tanggalRonda: '2026-09-05',
+            ketuaRegu: 'Budi Santoso',
+            lokasiPos: 'Pos Ronda Utama RT 010',
+            jamShift: '22.00 - 03.00 WIB',
+            catatan: 'Wajib membawa senter & kentongan patroli gang',
+            daftarWarga: [
+              { noKk: '3171010000000001', nama: 'Budi Santoso', noHp: '081234567890', peran: 'Ketua Regu' },
+              { noKk: '3171010000000003', nama: 'Agus Setiawan', noHp: '081234567892', peran: 'Anggota' },
+              { noKk: '3171010000000004', nama: 'Haji Abdullah', noHp: '081234567893', peran: 'Anggota' }
+            ]
+          }
+        ];
+        renderRondaCards(currentRondaMasterList);
+        checkMyRondaAssignment(currentRondaMasterList);
+      }, 300);
+    }
+  }
+
+  function renderRondaCards(list) {
+    var container = document.getElementById('rondaSchedulesListContainer');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!list || list.length === 0) {
+      container.innerHTML = '<div class="col-span-full p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs">Belum ada penjadwalan regu ronda yang dibuat pengurus.</div>';
+      return;
+    }
+
+    var isPengurus = currentUser && (
+      currentUser.role === 'Super Admin' ||
+      currentUser.statusUser === 'Pengurus RT' ||
+      currentUser.role === 'Pengurus RT' ||
+      currentUser.role === 'Ketua RT' ||
+      currentUser.role === 'Bendahara' ||
+      currentUser.role === 'Sekretaris'
+    );
+
+    for (var i = 0; i < list.length; i++) {
+      var item = list[i];
+      var card = document.createElement('div');
+      card.className = 'dashboard-card p-5 relative overflow-hidden flex flex-col justify-between border-l-4 border-l-brand-indigo';
+
+      var membersHtml = '';
+      for (var w = 0; w < item.daftarWarga.length; w++) {
+        var m = item.daftarWarga[w];
+        var isLeader = m.peran === 'Ketua Regu';
+        membersHtml += 
+          '<div class="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-100 text-xs">' +
+            '<div class="flex items-center gap-2">' +
+              '<div class="w-7 h-7 rounded-lg ' + (isLeader ? 'bg-amber-100 text-brand-amber font-bold' : 'bg-slate-200 text-slate-600') + ' flex items-center justify-center text-[11px]"><i class="fa-solid fa-user"></i></div>' +
+              '<div><p class="font-bold text-slate-800">' + m.nama + '</p><p class="text-[9px] text-slate-400 font-mono">' + m.noHp + '</p></div>' +
+            '</div>' +
+            (isLeader ? '<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[9px] font-bold"><i class="fa-solid fa-crown mr-0.5"></i>Ketua Regu</span>' : '<span class="text-[10px] text-slate-400">Anggota</span>') +
+          '</div>';
+      }
+
+      var actionAdminBtns = '';
+      if (isPengurus) {
+        actionAdminBtns = 
+          '<div class="flex items-center gap-1.5 mt-3 pt-2.5 border-t border-slate-100">' +
+            '<button onclick="viewRekapAbsenRonda(\'' + item.idJadwal + '\', \'' + encodeURIComponent(item.namaRegu) + '\', \'' + item.tanggalRonda + '\')" class="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 font-bold text-[11px] hover:bg-emerald-100 transition flex items-center gap-1"><i class="fa-solid fa-id-card-clip"></i> Rekap Selfie</button>' +
+            '<button onclick="deleteJadwalRonda(\'' + item.idJadwal + '\')" class="px-3 py-1.5 rounded-xl bg-rose-50 text-rose-600 font-bold text-[11px] hover:bg-rose-100 transition flex items-center gap-1"><i class="fa-solid fa-trash"></i> Hapus</button>' +
+          '</div>';
+      }
+
+      card.innerHTML = 
+        '<div>' +
+          '<div class="flex items-center justify-between mb-2">' +
+            '<span class="px-3 py-1 rounded-full text-[10px] font-black bg-brand-lavender text-brand-indigo"><i class="fa-solid fa-calendar-day mr-1"></i>' + item.tanggalRonda + '</span>' +
+            '<span class="text-[10px] font-mono text-slate-400 font-bold">' + item.idJadwal + '</span>' +
+          '</div>' +
+          '<h4 class="text-sm font-extrabold text-slate-800 mb-1">' + item.namaRegu + '</h4>' +
+          '<p class="text-xs font-semibold text-brand-pink mb-3"><i class="fa-solid fa-clock mr-1"></i>' + item.jamShift + ' • <i class="fa-solid fa-location-dot mr-1"></i>' + item.lokasiPos + '</p>' +
+          '<div class="space-y-1.5 mb-3">' + membersHtml + '</div>' +
+          (item.catatan ? '<p class="text-[11px] bg-amber-50 text-amber-900 p-2 rounded-xl border border-amber-200"><i class="fa-solid fa-circle-info mr-1"></i>' + item.catatan + '</p>' : '') +
+        '</div>' +
+        '<div>' + actionAdminBtns + '</div>';
+
+      container.appendChild(card);
+    }
+  }
+
+  function checkMyRondaAssignment(list) {
+    var myCardContainer = document.getElementById('wargaMyRondaCardContainer');
+    if (!myCardContainer) return;
+    myCardContainer.innerHTML = '';
+
+    if (!currentUser || !currentUser.noKk) return;
+
+    var myAssignment = null;
+    var todayObj = new Date();
+    todayObj.setHours(0,0,0,0);
+
+    for (var i = 0; i < list.length; i++) {
+      var item = list[i];
+      var rDate = new Date(item.tanggalRonda);
+      rDate.setHours(0,0,0,0);
+
+      var isMember = false;
+      for (var w = 0; w < item.daftarWarga.length; w++) {
+        if (item.daftarWarga[w].noKk === currentUser.noKk) {
+          isMember = true;
+          break;
+        }
+      }
+
+      if (isMember && rDate >= todayObj) {
+        if (!myAssignment || rDate < new Date(myAssignment.tanggalRonda)) {
+          myAssignment = item;
+        }
+      }
+    }
+
+    if (myAssignment) {
+      var card = document.createElement('div');
+      card.className = 'p-5 rounded-3xl bg-gradient-to-br from-brand-indigo via-brand-dark to-slate-900 text-white shadow-xl relative overflow-hidden border border-white/10';
+
+      var membersStr = myAssignment.daftarWarga.map(function(m) { return m.nama; }).join(', ');
+
+      card.innerHTML = 
+        '<div class="relative z-10 space-y-3">' +
+          '<div class="flex items-center justify-between">' +
+            '<span class="px-3 py-1 rounded-full text-[10px] font-black bg-brand-neon text-brand-dark uppercase">Tugas Ronda Anda</span>' +
+            '<span class="text-xs font-mono text-brand-neon font-bold"><i class="fa-solid fa-calendar mr-1"></i>' + myAssignment.tanggalRonda + '</span>' +
+          '</div>' +
+          '<div>' +
+            '<h3 class="text-lg font-black text-white">' + myAssignment.namaRegu + '</h3>' +
+            '<p class="text-xs text-slate-300 mt-0.5"><i class="fa-solid fa-clock mr-1 text-brand-neon"></i>' + myAssignment.jamShift + ' • Pos: ' + myAssignment.lokasiPos + '</p>' +
+          '</div>' +
+          '<div class="p-3 bg-white/10 rounded-2xl backdrop-blur-md text-xs space-y-1">' +
+            '<p><strong>Rekan 1 Regu:</strong> <span class="text-slate-200">' + membersStr + '</span></p>' +
+            '<p><strong>Ketua Regu:</strong> <span class="text-brand-amber font-bold">' + myAssignment.ketuaRegu + '</span></p>' +
+          '</div>' +
+          '<button onclick="openModalAbsenRonda(\'' + myAssignment.idJadwal + '\', \'' + encodeURIComponent(myAssignment.namaRegu) + '\', \'' + myAssignment.tanggalRonda + '\')" class="w-full py-3 rounded-full bg-brand-neon text-brand-dark font-black text-xs shadow-lg hover:bg-emerald-300 transition flex items-center justify-center gap-2">' +
+            '<i class="fa-solid fa-camera text-sm"></i>' +
+            '<span>Absen Selfie Presensi Ronda (Kamera Depan)</span>' +
+          '</button>' +
+        '</div>';
+
+      myCardContainer.appendChild(card);
+    }
+  }
+
+  function openModalKelolaRonda() {
+    var elId = document.getElementById('formRondaId');
+    var elNama = document.getElementById('formRondaNamaRegu');
+    var elTgl = document.getElementById('formRondaTanggal');
+    var elKetua = document.getElementById('formRondaKetua');
+    var elJam = document.getElementById('formRondaJamShift');
+    var elPos = document.getElementById('formRondaLokasiPos');
+    var elCatatan = document.getElementById('formRondaCatatan');
+
+    if (elId) elId.value = '';
+    if (elNama) elNama.value = 'Regu Ronda (Malam Minggu)';
+
+    var dateNow = new Date();
+    var dayOfWeek = dateNow.getDay();
+    var diffToSaturday = (6 - dayOfWeek + 7) % 7;
+    var nextSaturday = new Date(dateNow.setDate(dateNow.getDate() + diffToSaturday));
+    
+    var dayStr = ('0' + nextSaturday.getDate()).slice(-2);
+    var monthStr = ('0' + (nextSaturday.getMonth() + 1)).slice(-2);
+    if (elTgl) elTgl.value = nextSaturday.getFullYear() + '-' + monthStr + '-' + dayStr;
+
+    if (elKetua) elKetua.value = currentUser ? currentUser.nama : '';
+    if (elJam) elJam.value = '22.00 - 03.00 WIB';
+    if (elPos) elPos.value = 'Pos Ronda Utama RT 010 RW 05';
+    if (elCatatan) elCatatan.value = 'Wajib membawa senter, kentongan, & patroli lingkungan.';
+
+    fetchWargaListForRondaCheckboxes();
+    var modal = document.getElementById('modalKelolaRonda');
+    if (modal) modal.classList.remove('hidden');
+  }
+
+  function validateRondaSaturday(inputEl) {
+    if (!inputEl || !inputEl.value) return;
+    var selectedDate = new Date(inputEl.value);
+    if (selectedDate.getDay() !== 6) {
+      showToast('Perhatian: Ronda RT secara khusus diadakan pada Hari Sabtu (Malam Minggu).', 'info');
+    }
+  }
+
+  function fetchWargaListForRondaCheckboxes() {
+    var container = document.getElementById('formRondaWargaCheckboxes');
+    if (!container) return;
+    container.innerHTML = '<div class="text-center text-slate-400 text-xs py-2"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Memuat daftar warga...</div>';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success) {
+            currentWargaSelectionList = res.data || [];
+            renderWargaRondaCheckboxes(currentWargaSelectionList);
+          }
+        })
+        .getWargaList({ limit: 100, offset: 0 });
+    } else {
+      setTimeout(function() {
+        currentWargaSelectionList = [
+          { noKk: '3171010000000001', nama: 'Budi Santoso', noHp: '081234567890' },
+          { noKk: '3171010000000003', nama: 'Agus Setiawan', noHp: '081234567892' },
+          { noKk: '3171010000000004', nama: 'Haji Abdullah', noHp: '081234567893' }
+        ];
+        renderWargaRondaCheckboxes(currentWargaSelectionList);
+      }, 300);
+    }
+  }
+
+  function renderWargaRondaCheckboxes(wargaList) {
+    var container = document.getElementById('formRondaWargaCheckboxes');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!wargaList || wargaList.length === 0) {
+      container.innerHTML = '<p class="text-xs text-slate-400">Belum ada data warga terdaftar.</p>';
+      return;
+    }
+
+    for (var i = 0; i < wargaList.length; i++) {
+      var w = wargaList[i];
+      var label = document.createElement('label');
+      label.className = 'flex items-center justify-between p-2 rounded-xl bg-white border border-slate-200 cursor-pointer hover:border-brand-indigo transition';
+
+      label.innerHTML = 
+        '<div class="flex items-center gap-2">' +
+          '<input type="checkbox" value="' + w.noKk + '" data-nama="' + encodeURIComponent(w.nama) + '" data-hp="' + w.noHp + '" class="rondaWargaChk text-brand-pink rounded focus:ring-brand-pink">' +
+          '<span class="font-bold text-slate-800 text-xs">' + w.nama + '</span>' +
+        '</div>' +
+        '<span class="text-[10px] text-slate-400 font-mono">KK: ' + w.noKk + '</span>';
+
+      container.appendChild(label);
+    }
+  }
+
+  function handleSaveKelolaRonda() {
+    var checkboxes = document.querySelectorAll('.rondaWargaChk:checked');
+    if (checkboxes.length === 0) {
+      showToast('Pilih minimal 1 warga anggota regu ronda!', 'error');
+      return;
+    }
+
+    var selectedWarga = [];
+    var ketuaInput = document.getElementById('formRondaKetua');
+    var ketuaNama = ketuaInput ? ketuaInput.value.trim() : '';
+
+    checkboxes.forEach(function(chk) {
+      var nama = decodeURIComponent(chk.dataset.nama);
+      var hp = chk.dataset.hp;
+      var kk = chk.value;
+      var isKetua = (nama.toLowerCase() === ketuaNama.toLowerCase());
+
+      selectedWarga.push({
+        noKk: kk,
+        nama: nama,
+        noHp: hp,
+        peran: isKetua ? 'Ketua Regu' : 'Anggota'
+      });
+    });
+
+    var payload = {
+      idJadwal: document.getElementById('formRondaId') ? document.getElementById('formRondaId').value : '',
+      namaRegu: document.getElementById('formRondaNamaRegu') ? document.getElementById('formRondaNamaRegu').value : '',
+      tanggalRonda: document.getElementById('formRondaTanggal') ? document.getElementById('formRondaTanggal').value : '',
+      ketuaRegu: ketuaNama,
+      lokasiPos: document.getElementById('formRondaLokasiPos') ? document.getElementById('formRondaLokasiPos').value : '',
+      jamShift: document.getElementById('formRondaJamShift') ? document.getElementById('formRondaJamShift').value : '',
+      catatan: document.getElementById('formRondaCatatan') ? document.getElementById('formRondaCatatan').value : '',
+      daftarWarga: selectedWarga
+    };
+
+    var btn = document.getElementById('btnSaveKelolaRonda');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = 'Menyimpan Penjadwalan...';
+    }
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerText = 'Simpan Penjadwalan';
+          }
+          closeModal('modalKelolaRonda');
+          if (res && res.success) {
+            showToast(res.message, 'success');
+            fetchRondaSchedules();
+            refreshData();
+          } else {
+            showToast(res ? res.message : 'Gagal.', 'error');
+          }
+        })
+        .saveJadwalRonda(payload);
+    } else {
+      setTimeout(function() {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = 'Simpan Penjadwalan';
+        }
+        closeModal('modalKelolaRonda');
+        showToast('Jadwal ronda malam minggu disimpan (Demo)', 'success');
+        fetchRondaSchedules();
+      }, 400);
+    }
+  }
+
+  function deleteJadwalRonda(idJadwal) {
+    showToast('Menghapus jadwal ronda...', 'info');
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success) {
+            showToast(res.message, 'success');
+            fetchRondaSchedules();
+            refreshData();
+          } else {
+            showToast(res ? res.message : 'Gagal menghapus.', 'error');
+          }
+        })
+        .deleteJadwalRonda(idJadwal);
+    } else {
+      setTimeout(function() {
+        showToast('Jadwal ronda dihapus (Demo)', 'success');
+        fetchRondaSchedules();
+      }, 300);
+    }
+  }
+
+  function openModalAbsenRonda(idJadwal, namaReguEnc, tglRonda) {
+    var elId = document.getElementById('absenRondaIdJadwal');
+    var elTgl = document.getElementById('absenRondaTanggal');
+    var elTitle = document.getElementById('absenRondaTitleRegu');
+    var elNama = document.getElementById('absenWargaNama');
+    var elTime = document.getElementById('absenWargaTime');
+
+    if (elId) elId.value = idJadwal;
+    if (elTgl) elTgl.value = tglRonda;
+    if (elTitle) elTitle.innerText = decodeURIComponent(namaReguEnc) + ' • Tanggal: ' + tglRonda;
+    if (elNama) elNama.innerText = currentUser ? currentUser.nama : 'Warga RT 010';
+    
+    var dateNow = new Date();
+    if (elTime) elTime.innerText = dateNow.toLocaleTimeString('id-ID') + ' WIB';
+
+    capturedSelfieBase64 = '';
+    resetSelfieCameraUI();
+    startSelfieFrontCamera();
+
+    var modal = document.getElementById('modalAbsenRonda');
+    if (modal) modal.classList.remove('hidden');
+  }
+
+  function startSelfieFrontCamera() {
+    var video = document.getElementById('selfieVideoFeed');
+    var canvas = document.getElementById('selfieCanvas');
+    if (video) video.classList.remove('hidden');
+    if (canvas) canvas.classList.add('hidden');
+
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      var constraints = {
+        video: {
+          facingMode: 'user',
+          width: { ideal: 640 },
+          height: { ideal: 640 }
+        },
+        audio: false
+      };
+
+      navigator.mediaDevices.getUserMedia(constraints)
+        .then(function(stream) {
+          selfieMediaStream = stream;
+          if (video) video.srcObject = stream;
+        })
+        .catch(function(err) {
+          console.warn('Gagal membuka kamera depan otomatis:', err);
+          showToast('Kamera depan tidak dapat diakses otomatis. Anda bisa menggunakan unggah foto manual.', 'info');
+        });
+    }
+  }
+
+  function stopSelfieCameraStream() {
+    if (selfieMediaStream) {
+      selfieMediaStream.getTracks().forEach(function(track) {
+        track.stop();
+      });
+      selfieMediaStream = null;
+    }
+  }
+
+  function takeSelfieSnapshot() {
+    var video = document.getElementById('selfieVideoFeed');
+    var canvas = document.getElementById('selfieCanvas');
+    if (!video || !canvas) return;
+
+    var context = canvas.getContext('2d');
+
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      showToast('Kamera belum siap atau tidak aktif!', 'error');
+      return;
+    }
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    context.translate(canvas.width, 0);
+    context.scale(-1, 1);
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    capturedSelfieBase64 = canvas.toDataURL('image/jpeg', 0.85);
+
+    stopSelfieCameraStream();
+    video.classList.add('hidden');
+    canvas.classList.remove('hidden');
+
+    var btnCap = document.getElementById('btnCaptureSelfie');
+    var btnRet = document.getElementById('btnRetakeSelfie');
+    var btnSub = document.getElementById('btnSubmitSelfieAbsen');
+    var overlay = document.getElementById('selfieGuideOverlay');
+
+    if (btnCap) btnCap.classList.add('hidden');
+    if (btnRet) btnRet.classList.remove('hidden');
+    if (btnSub) btnSub.classList.remove('hidden');
+    if (overlay) overlay.classList.add('hidden');
+  }
+
+  function handleSelfieFileFallback(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      capturedSelfieBase64 = e.target.result;
+
+      var canvas = document.getElementById('selfieCanvas');
+      var video = document.getElementById('selfieVideoFeed');
+      if (!canvas) return;
+
+      var ctx = canvas.getContext('2d');
+      var img = new Image();
+
+      img.onload = function() {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+
+        stopSelfieCameraStream();
+        if (video) video.classList.add('hidden');
+        canvas.classList.remove('hidden');
+
+        var btnCap = document.getElementById('btnCaptureSelfie');
+        var btnRet = document.getElementById('btnRetakeSelfie');
+        var btnSub = document.getElementById('btnSubmitSelfieAbsen');
+        var overlay = document.getElementById('selfieGuideOverlay');
+
+        if (btnCap) btnCap.classList.add('hidden');
+        if (btnRet) btnRet.classList.remove('hidden');
+        if (btnSub) btnSub.classList.remove('hidden');
+        if (overlay) overlay.classList.add('hidden');
+      };
+      img.src = capturedSelfieBase64;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function resetSelfieCamera() {
+    capturedSelfieBase64 = '';
+    resetSelfieCameraUI();
+    startSelfieFrontCamera();
+  }
+
+  function resetSelfieCameraUI() {
+    var video = document.getElementById('selfieVideoFeed');
+    var canvas = document.getElementById('selfieCanvas');
+    if (video) video.classList.remove('hidden');
+    if (canvas) canvas.classList.add('hidden');
+
+    var btnCap = document.getElementById('btnCaptureSelfie');
+    var btnRet = document.getElementById('btnRetakeSelfie');
+    var btnSub = document.getElementById('btnSubmitSelfieAbsen');
+    var overlay = document.getElementById('selfieGuideOverlay');
+
+    if (btnCap) btnCap.classList.remove('hidden');
+    if (btnRet) btnRet.classList.add('hidden');
+    if (btnSub) btnSub.classList.add('hidden');
+    if (overlay) overlay.classList.remove('hidden');
+  }
+
+  function closeModalAbsenRonda() {
+    stopSelfieCameraStream();
+    closeModal('modalAbsenRonda');
+  }
+
+  function submitSelfieAttendance() {
+    if (!capturedSelfieBase64) {
+      showToast('Ambil foto selfie terlebih dahulu!', 'error');
+      return;
+    }
+
+    var payload = {
+      idJadwal: document.getElementById('absenRondaIdJadwal') ? document.getElementById('absenRondaIdJadwal').value : '',
+      tanggalRonda: document.getElementById('absenRondaTanggal') ? document.getElementById('absenRondaTanggal').value : '',
+      noKk: currentUser ? currentUser.noKk : '',
+      namaWarga: currentUser ? currentUser.nama : 'Warga',
+      fotoSelfie: capturedSelfieBase64
+    };
+
+    var btn = document.getElementById('btnSubmitSelfieAbsen');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = 'Mengirim Presensi...';
+    }
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerText = 'Kirim Absensi Ronda';
+          }
+          closeModalAbsenRonda();
+          if (res && res.success) {
+            showToast(res.message, 'success');
+            fetchRondaSchedules();
+            refreshData();
+          } else {
+            showToast(res ? res.message : 'Gagal mengirim presensi.', 'error');
+          }
+        })
+        .submitAbsenRonda(payload);
+    } else {
+      setTimeout(function() {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = 'Kirim Absensi Ronda';
+        }
+        closeModalAbsenRonda();
+        showToast('Absensi selfie presensi ronda berhasil! (Demo)', 'success');
+        fetchRondaSchedules();
+      }, 500);
+    }
+  }
+
+  function viewRekapAbsenRonda(idJadwal, namaReguEnc, tglRonda) {
+    var sub = document.getElementById('rekapRondaSubtitle');
+    if (sub) sub.innerText = decodeURIComponent(namaReguEnc) + ' • Tanggal: ' + tglRonda;
+    var container = document.getElementById('rekapAbsenGridContainer');
+    if (container) {
+      container.innerHTML = '<div class="col-span-full text-center text-slate-400 text-xs py-6"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat foto presensi selfie warga...</div>';
+    }
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success) renderRekapAbsenGrid(res.data);
+        })
+        .getRekapAbsenRonda(idJadwal);
+    } else {
+      setTimeout(function() {
+        renderRekapAbsenGrid([
+          {
+            idAbsen: 'ABS-0001',
+            namaWarga: 'Budi Santoso',
+            waktuAbsen: '05/09/2026 22:15:00',
+            statusHadir: 'Hadir (Selfie Pos)',
+            fotoSelfie: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+          }
+        ]);
+      }, 300);
+    }
+
+    var modal = document.getElementById('modalRekapAbsenRonda');
+    if (modal) modal.classList.remove('hidden');
+  }
+
+  function renderRekapAbsenGrid(list) {
+    var container = document.getElementById('rekapAbsenGridContainer');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!list || list.length === 0) {
+      container.innerHTML = '<div class="col-span-full p-6 text-center text-slate-400 text-xs bg-slate-50 rounded-2xl border border-dashed border-slate-200">Belum ada warga yang melakukan absensi selfie untuk jadwal ini.</div>';
+      return;
+    }
+
+    for (var i = 0; i < list.length; i++) {
+      var item = list[i];
+      var card = document.createElement('div');
+      card.className = 'p-3 rounded-2xl bg-slate-50 border border-slate-200 space-y-2';
+
+      var imgSrc = item.fotoSelfie && item.fotoSelfie.indexOf('data:image') === 0 
+        ? item.fotoSelfie 
+        : 'https://via.placeholder.com/150?text=Selfie+Pos';
+
+      card.innerHTML = 
+        '<div class="w-full aspect-square bg-slate-200 rounded-xl overflow-hidden border border-slate-300 relative">' +
+          '<img src="' + imgSrc + '" class="w-full h-full object-cover">' +
+          '<span class="absolute bottom-2 right-2 px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-600 text-white shadow"><i class="fa-solid fa-check mr-1"></i>Hadir</span>' +
+        '</div>' +
+        '<div>' +
+          '<h5 class="text-xs font-bold text-slate-800">' + item.namaWarga + '</h5>' +
+          '<p class="text-[10px] text-slate-400 font-mono"><i class="fa-solid fa-clock mr-1"></i>' + item.waktuAbsen + '</p>' +
+        '</div>';
+
+      container.appendChild(card);
+    }
+  }
+</script>
