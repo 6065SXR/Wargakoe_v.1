@@ -1,0 +1,438 @@
+<script>
+  var currentAsetMasterList = [];
+
+  function fetchAsetData() {
+    var container = document.getElementById('asetCardsContainer');
+    container.innerHTML = '<div class="col-span-full p-6 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat data aset RT...</div>';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success) {
+            currentAsetMasterList = res.data || [];
+            renderAsetCards(currentAsetMasterList);
+            populateAsetDropdown(currentAsetMasterList);
+          }
+        })
+        .getAsetList();
+    } else {
+      setTimeout(function() {
+        currentAsetMasterList = [
+          { idAset: 'AST-0001', namaAset: 'Tenda Terpal Lipat (3x3 M)', kategori: 'Peralatan Tenda', jumlahTotal: 4, jumlahTersedia: 4, kondisi: 'Sangat Baik', lokasiPenyimpanan: 'Gudang Pos Ronda RT 010', keterangan: 'Lengkap tiang' },
+          { idAset: 'AST-0002', namaAset: 'Kursi Plastik Hijau', kategori: 'Peralatan Duduk', jumlahTotal: 50, jumlahTersedia: 30, kondisi: 'Baik', lokasiPenyimpanan: 'Gudang Pos Ronda RT 010', keterangan: 'Merk Napolly' },
+          { idAset: 'AST-0003', namaAset: 'Sound System Portabel Wireless', kategori: 'Elektronik / Audio', jumlahTotal: 2, jumlahTersedia: 2, kondisi: 'Sangat Baik', lokasiPenyimpanan: 'Rumah Ketua RT', keterangan: 'Include 2 mic' }
+        ];
+        renderAsetCards(currentAsetMasterList);
+        populateAsetDropdown(currentAsetMasterList);
+      }, 300);
+    }
+  }
+
+  function renderAsetCards(list) {
+    var container = document.getElementById('asetCardsContainer');
+    container.innerHTML = '';
+
+    if (!list || list.length === 0) {
+      container.innerHTML = '<div class="col-span-full p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs">Belum ada aset inventaris yang didaftarkan.</div>';
+      return;
+    }
+
+    var isPengurus = currentUser && (
+      currentUser.role === 'Super Admin' ||
+      currentUser.statusUser === 'Pengurus RT' ||
+      currentUser.role === 'Pengurus RT' ||
+      currentUser.role === 'Ketua RT' ||
+      currentUser.role === 'Bendahara' ||
+      currentUser.role === 'Sekretaris'
+    );
+
+    for (var i = 0; i < list.length; i++) {
+      var item = list[i];
+      var card = document.createElement('div');
+      card.className = 'dashboard-card p-4 flex flex-col justify-between hover:shadow-md transition relative';
+
+      // Badge kondisi
+      var kondisiClass = 'bg-emerald-100 text-emerald-800';
+      if (item.kondisi === 'Rusak Ringan') kondisiClass = 'bg-amber-100 text-amber-800';
+      else if (item.kondisi === 'Dalam Perbaikan') kondisiClass = 'bg-rose-100 text-rose-800';
+
+      var stokClass = item.jumlahTersedia > 0 ? 'text-emerald-700 bg-emerald-50' : 'text-rose-700 bg-rose-50';
+
+      var actionEditDelete = '';
+      if (isPengurus) {
+        actionEditDelete = 
+          '<div class="flex items-center gap-1.5 mt-3 pt-2.5 border-t border-slate-100">' +
+            '<button onclick="editAset(\'' + item.idAset + '\', \'' + encodeURIComponent(item.namaAset) + '\', \'' + encodeURIComponent(item.kategori) + '\', ' + item.jumlahTotal + ', \'' + encodeURIComponent(item.kondisi) + '\', \'' + encodeURIComponent(item.lokasiPenyimpanan) + '\', \'' + encodeURIComponent(item.keterangan || '') + '\')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] transition flex items-center gap-1"><i class="fa-solid fa-pen-to-square"></i> Edit</button>' +
+            '<button onclick="handleDeleteAset(\'' + item.idAset + '\')" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-[11px] transition flex items-center gap-1"><i class="fa-solid fa-trash"></i> Hapus</button>' +
+          '</div>';
+      }
+
+      card.innerHTML = 
+        '<div>' +
+          '<div class="flex items-center justify-between mb-2">' +
+            '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ' + kondisiClass + '">' + item.kondisi + '</span>' +
+            '<span class="text-[10px] font-mono font-bold text-slate-400">' + item.idAset + '</span>' +
+          '</div>' +
+          '<h4 class="text-xs font-bold text-slate-800 leading-snug mb-1">' + item.namaAset + '</h4>' +
+          '<p class="text-[10px] text-slate-400 mb-2.5"><i class="fa-solid fa-tag mr-1"></i>' + item.kategori + '</p>' +
+          '<div class="flex items-center justify-between p-2 rounded-xl ' + stokClass + ' mb-2 text-xs">' +
+            '<span class="font-medium text-[11px]">Tersedia:</span>' +
+            '<strong class="text-sm font-black">' + item.jumlahTersedia + ' / ' + item.jumlahTotal + ' unit</strong>' +
+          '</div>' +
+          '<p class="text-[10px] text-slate-500 truncate" title="' + item.lokasiPenyimpanan + '"><i class="fa-solid fa-location-dot mr-1 text-slate-400"></i>' + item.lokasiPenyimpanan + '</p>' +
+        '</div>' +
+        '<div>' +
+          '<button onclick="openModalPinjamAset(\'' + item.idAset + '\')" class="w-full mt-3 py-2 rounded-xl bg-brand-lavender text-brand-indigo font-bold text-xs hover:bg-brand-indigo hover:text-white transition flex items-center justify-center gap-1.5">' +
+            '<i class="fa-solid fa-hand-holding-box text-xs"></i> Pinjam Barang Ini' +
+          '</button>' +
+          actionEditDelete +
+        '</div>';
+
+      container.appendChild(card);
+    }
+  }
+
+  function populateAsetDropdown(list) {
+    var select = document.getElementById('pinjamPilihAset');
+    if (!select) return;
+    select.innerHTML = '';
+
+    for (var i = 0; i < list.length; i++) {
+      var opt = document.createElement('option');
+      opt.value = list[i].idAset;
+      opt.text = list[i].namaAset + ' (Sisa ' + list[i].jumlahTersedia + ' unit)';
+      opt.dataset.tersedia = list[i].jumlahTersedia;
+      select.appendChild(opt);
+    }
+    updatePinjamMaxQty();
+  }
+
+  function updatePinjamMaxQty() {
+    var select = document.getElementById('pinjamPilihAset');
+    var qtyInput = document.getElementById('pinjamQty');
+    var infoStok = document.getElementById('pinjamInfoStok');
+    if (!select || !qtyInput) return;
+
+    var selectedOpt = select.options[select.selectedIndex];
+    if (selectedOpt) {
+      var sisa = parseInt(selectedOpt.dataset.tersedia, 10) || 0;
+      qtyInput.max = sisa;
+      if (sisa > 0 && parseInt(qtyInput.value, 10) > sisa) qtyInput.value = sisa;
+      infoStok.innerText = 'Stok saat ini siap dipinjam: ' + sisa + ' unit';
+      infoStok.className = sisa > 0 ? 'text-[10px] text-emerald-600 font-semibold mt-1' : 'text-[10px] text-rose-600 font-semibold mt-1';
+    }
+  }
+
+  function openModalPinjamAset(defaultAsetId) {
+    document.getElementById('pinjamNamaWarga').value = currentUser ? (currentUser.nama + ' (KK: ' + currentUser.noKk + ')') : 'Warga RT 010';
+    document.getElementById('pinjamNoHp').value = currentUser ? (currentUser.noHp || '') : '';
+    document.getElementById('pinjamQty').value = 1;
+    document.getElementById('pinjamKeperluan').value = '';
+
+    var dateNow = new Date();
+    var dayStr = ('0' + dateNow.getDate()).slice(-2);
+    var monthStr = ('0' + (dateNow.getMonth() + 1)).slice(-2);
+    var todayIso = dateNow.getFullYear() + '-' + monthStr + '-' + dayStr;
+
+    document.getElementById('pinjamTglMulai').value = todayIso;
+    document.getElementById('pinjamTglKembali').value = todayIso;
+
+    if (defaultAsetId) {
+      document.getElementById('pinjamPilihAset').value = defaultAsetId;
+    }
+    updatePinjamMaxQty();
+    document.getElementById('modalPinjamAset').classList.remove('hidden');
+  }
+
+  function handleSavePinjamAset() {
+    var selectAset = document.getElementById('pinjamPilihAset');
+    var qty = parseInt(document.getElementById('pinjamQty').value, 10) || 0;
+
+    if (qty <= 0) {
+      showToast('Jumlah pinjam minimal 1 unit!', 'error');
+      return;
+    }
+
+    var payload = {
+      idAset: selectAset.value,
+      noKk: currentUser ? currentUser.noKk : '',
+      namaPeminjam: currentUser ? currentUser.nama : 'Warga',
+      noHp: document.getElementById('pinjamNoHp').value,
+      jumlahPinjam: qty,
+      tanggalPinjam: document.getElementById('pinjamTglMulai').value,
+      tanggalKembali: document.getElementById('pinjamTglKembali').value,
+      keperluan: document.getElementById('pinjamKeperluan').value
+    };
+
+    var btn = document.getElementById('btnSubmitPinjamAset');
+    btn.disabled = true;
+    btn.innerText = 'Mengirim Permohonan...';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          btn.disabled = false;
+          btn.innerText = 'Ajukan Peminjaman';
+          closeModal('modalPinjamAset');
+          if (res && res.success) {
+            showToast(res.message, 'success');
+            fetchAsetData();
+            fetchPeminjamanData();
+            refreshData();
+          } else {
+            showToast(res ? res.message : 'Gagal.', 'error');
+          }
+        })
+        .submitPinjamAset(payload);
+    } else {
+      setTimeout(function() {
+        btn.disabled = false;
+        btn.innerText = 'Ajukan Peminjaman';
+        closeModal('modalPinjamAset');
+        showToast('Pengajuan peminjaman berhasil dikirim! Status: Menunggu', 'success');
+        fetchAsetData();
+        fetchPeminjamanData();
+      }, 400);
+    }
+  }
+
+  function openModalTambahAset() {
+    document.getElementById('formAsetId').value = '';
+    document.getElementById('formAsetNama').value = '';
+    document.getElementById('formAsetKategori').value = 'Peralatan Tenda';
+    document.getElementById('formAsetTotal').value = '1';
+    document.getElementById('formAsetKondisi').value = 'Baik';
+    document.getElementById('formAsetLokasi').value = 'Gudang Pos Ronda RT 010';
+    document.getElementById('formAsetKeterangan').value = '';
+    document.getElementById('modalKelolaAsetTitle').innerHTML = '<i class="fa-solid fa-boxes-stacked text-brand-indigo"></i><span>Tambah Data Aset RT</span>';
+    document.getElementById('modalKelolaAset').classList.remove('hidden');
+  }
+
+  function editAset(id, namaEnc, katEnc, total, kondisiEnc, lokasiEnc, ketEnc) {
+    document.getElementById('formAsetId').value = id;
+    document.getElementById('formAsetNama').value = decodeURIComponent(namaEnc);
+    document.getElementById('formAsetKategori').value = decodeURIComponent(katEnc);
+    document.getElementById('formAsetTotal').value = total;
+    document.getElementById('formAsetKondisi').value = decodeURIComponent(kondisiEnc);
+    document.getElementById('formAsetLokasi').value = decodeURIComponent(lokasiEnc);
+    document.getElementById('formAsetKeterangan').value = decodeURIComponent(ketEnc || '');
+    document.getElementById('modalKelolaAsetTitle').innerHTML = '<i class="fa-solid fa-pen-to-square text-brand-indigo"></i><span>Edit Data Aset RT</span>';
+    document.getElementById('modalKelolaAset').classList.remove('hidden');
+  }
+
+  function handleSaveKelolaAset() {
+    var payload = {
+      idAset: document.getElementById('formAsetId').value,
+      namaAset: document.getElementById('formAsetNama').value,
+      kategori: document.getElementById('formAsetKategori').value,
+      jumlahTotal: document.getElementById('formAsetTotal').value,
+      kondisi: document.getElementById('formAsetKondisi').value,
+      lokasiPenyimpanan: document.getElementById('formAsetLokasi').value,
+      keterangan: document.getElementById('formAsetKeterangan').value
+    };
+
+    var btn = document.getElementById('btnSaveKelolaAset');
+    btn.disabled = true;
+    btn.innerText = 'Menyimpan...';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          btn.disabled = false;
+          btn.innerText = 'Simpan Data Aset';
+          closeModal('modalKelolaAset');
+          if (res && res.success) {
+            showToast(res.message, 'success');
+            fetchAsetData();
+          } else {
+            showToast(res ? res.message : 'Gagal.', 'error');
+          }
+        })
+        .saveAset(payload);
+    } else {
+      setTimeout(function() {
+        btn.disabled = false;
+        btn.innerText = 'Simpan Data Aset';
+        closeModal('modalKelolaAset');
+        showToast('Data aset berhasil disimpan (Demo)', 'success');
+        fetchAsetData();
+      }, 400);
+    }
+  }
+
+  function handleDeleteAset(idAset) {
+    if (!confirm('Apakah Anda yakin ingin menghapus aset ini dari daftar inventaris?')) return;
+    showToast('Menghapus...', 'info');
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success) {
+            showToast(res.message, 'success');
+            fetchAsetData();
+          } else {
+            showToast(res ? res.message : 'Gagal.', 'error');
+          }
+        })
+        .deleteAset(idAset);
+    } else {
+      setTimeout(function() {
+        showToast('Aset berhasil dihapus (Demo)', 'success');
+        fetchAsetData();
+      }, 300);
+    }
+  }
+
+  function fetchPeminjamanData() {
+    var status = document.getElementById('filterPeminjamanStatus') ? document.getElementById('filterPeminjamanStatus').value : 'SEMUA';
+    var tbody = document.getElementById('peminjamanTableBody');
+    tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat riwayat peminjaman...</td></tr>';
+
+    var params = {
+      status: status,
+      role: currentUser ? currentUser.role : 'Warga',
+      noKk: currentUser ? currentUser.noKk : ''
+    };
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success) renderPeminjamanTable(res.data);
+        })
+        .getPeminjamanList(params);
+    } else {
+      setTimeout(function() {
+        renderPeminjamanTable([
+          { idPinjam: 'PJM-0001', namaAset: 'Kursi Plastik Hijau', noKk: '3171010000000003', namaPeminjam: 'Agus Setiawan', noHp: '081234567892', jumlahPinjam: 20, tanggalPinjam: '10/09/2026', tanggalKembali: '12/09/2026', keperluan: 'Acara syukuran aqiqah di rumah', status: 'Menunggu', catatanPengurus: '-', disetujuiOleh: '-' }
+        ]);
+      }, 300);
+    }
+  }
+
+  function renderPeminjamanTable(list) {
+    var tbody = document.getElementById('peminjamanTableBody');
+    tbody.innerHTML = '';
+
+    if (!list || list.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400">Belum ada data peminjaman aset.</td></tr>';
+      return;
+    }
+
+    var isPengurus = currentUser && (
+      currentUser.role === 'Super Admin' ||
+      currentUser.statusUser === 'Pengurus RT' ||
+      currentUser.role === 'Pengurus RT' ||
+      currentUser.role === 'Ketua RT' ||
+      currentUser.role === 'Bendahara' ||
+      currentUser.role === 'Sekretaris'
+    );
+
+    for (var i = 0; i < list.length; i++) {
+      var row = list[i];
+      var tr = document.createElement('tr');
+      tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+
+      var statusBadge = '';
+      if (row.status === 'Disetujui') {
+        statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800"><i class="fa-solid fa-check mr-1"></i>Disetujui</span>';
+      } else if (row.status === 'Menunggu') {
+        statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 animate-pulse"><i class="fa-solid fa-clock mr-1"></i>Menunggu</span>';
+      } else if (row.status === 'Selesai') {
+        statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-800"><i class="fa-solid fa-box-check mr-1"></i>Kembali</span>';
+      } else {
+        statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800"><i class="fa-solid fa-xmark mr-1"></i>Ditolak</span>';
+      }
+
+      var actionBtns = '-';
+      if (isPengurus) {
+        if (row.status === 'Menunggu') {
+          actionBtns = 
+            '<div class="flex items-center justify-center gap-1">' +
+              '<button onclick="openAksiPeminjamanModal(\'' + row.idPinjam + '\', \'' + encodeURIComponent(row.namaAset) + '\', \'' + encodeURIComponent(row.namaPeminjam) + '\', \'APPROVE\')" class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] shadow transition"><i class="fa-solid fa-check mr-0.5"></i> Setujui</button>' +
+              '<button onclick="openAksiPeminjamanModal(\'' + row.idPinjam + '\', \'' + encodeURIComponent(row.namaAset) + '\', \'' + encodeURIComponent(row.namaPeminjam) + '\', \'REJECT\')" class="px-2 py-1 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold text-[10px] transition"><i class="fa-solid fa-xmark mr-0.5"></i> Tolak</button>' +
+            '</div>';
+        } else if (row.status === 'Disetujui') {
+          actionBtns = 
+            '<div class="flex items-center justify-center">' +
+              '<button onclick="openAksiPeminjamanModal(\'' + row.idPinjam + '\', \'' + encodeURIComponent(row.namaAset) + '\', \'' + encodeURIComponent(row.namaPeminjam) + '\', \'SELESAI\')" class="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] shadow transition"><i class="fa-solid fa-rotate-left mr-1"></i> Selesai / Kembali</button>' +
+            '</div>';
+        }
+      }
+
+      tr.innerHTML = 
+        '<td class="p-3.5"><p class="font-bold text-slate-800">' + row.namaAset + '</p><p class="text-[11px] font-bold text-brand-indigo font-mono"><i class="fa-solid fa-layer-group mr-1"></i>' + row.jumlahPinjam + ' Unit</p></td>' +
+        '<td class="p-3.5"><p class="font-semibold text-slate-800">' + row.namaPeminjam + '</p><p class="text-[10px] text-slate-400 font-mono"><i class="fa-solid fa-phone mr-1"></i>' + row.noHp + '</p></td>' +
+        '<td class="p-3.5 text-[11px] text-slate-600"><div><i class="fa-solid fa-calendar-arrow-down text-emerald-600 mr-1"></i>' + row.tanggalPinjam + '</div><div class="mt-0.5"><i class="fa-solid fa-calendar-arrow-up text-amber-600 mr-1"></i>' + row.tanggalKembali + '</div></td>' +
+        '<td class="p-3.5 max-w-[200px]"><p class="text-slate-700 font-medium truncate" title="' + row.keperluan + '">' + row.keperluan + '</p><p class="text-[10px] text-slate-400 mt-0.5">Ket: ' + (row.catatanPengurus || '-') + '</p></td>' +
+        '<td class="p-3.5">' + statusBadge + '</td>' +
+        '<td class="p-3.5 text-center">' + actionBtns + '</td>';
+
+      tbody.appendChild(tr);
+    }
+  }
+
+  function openAksiPeminjamanModal(idPinjam, namaAsetEnc, namaWargaEnc, actionType) {
+    document.getElementById('aksiPinjamId').value = idPinjam;
+    document.getElementById('aksiPinjamAction').value = actionType;
+    document.getElementById('aksiPinjamNamaAset').innerText = decodeURIComponent(namaAsetEnc);
+    document.getElementById('aksiPinjamNamaWarga').innerText = decodeURIComponent(namaWargaEnc);
+    document.getElementById('aksiPinjamCatatan').value = '';
+
+    var btn = document.getElementById('btnSubmitAksiPeminjaman');
+    var desc = document.getElementById('aksiPinjamDeskripsi');
+
+    if (actionType === 'APPROVE') {
+      btn.className = 'px-5 py-2.5 rounded-full font-bold shadow-md text-white bg-emerald-600 hover:bg-emerald-700';
+      btn.innerText = 'Setujui Peminjaman';
+      desc.innerText = 'Aksi ini akan menyetujui peminjaman dan otomatis mengurangi stok ketersediaan barang.';
+    } else if (actionType === 'REJECT') {
+      btn.className = 'px-5 py-2.5 rounded-full font-bold shadow-md text-white bg-rose-600 hover:bg-rose-700';
+      btn.innerText = 'Tolak Peminjaman';
+      desc.innerText = 'Aksi ini akan menolak permohonan peminjaman aset warga.';
+    } else if (actionType === 'SELESAI') {
+      btn.className = 'px-5 py-2.5 rounded-full font-bold shadow-md text-white bg-indigo-600 hover:bg-indigo-700';
+      btn.innerText = 'Konfirmasi Barang Kembali';
+      desc.innerText = 'Aksi ini menandai barang telah selesai digunakan & dikembalikan ke RT. Stok tersedia otomatis dipulihkan.';
+    }
+
+    document.getElementById('modalAksiPeminjaman').classList.remove('hidden');
+  }
+
+  function submitAksiPeminjaman() {
+    var idPinjam = document.getElementById('aksiPinjamId').value;
+    var action = document.getElementById('aksiPinjamAction').value;
+    var catatan = document.getElementById('aksiPinjamCatatan').value;
+    var approver = currentUser ? currentUser.nama : 'Pengurus RT';
+
+    var btn = document.getElementById('btnSubmitAksiPeminjaman');
+    btn.disabled = true;
+    btn.innerText = 'Memproses...';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          btn.disabled = false;
+          btn.innerText = 'Proses Sekarang';
+          closeModal('modalAksiPeminjaman');
+          if (res && res.success) {
+            showToast(res.message, 'success');
+            fetchPeminjamanData();
+            fetchAsetData();
+            refreshData();
+          } else {
+            showToast(res ? res.message : 'Gagal memproses.', 'error');
+          }
+        })
+        .approvePeminjamanAset(idPinjam, action, catatan, approver);
+    } else {
+      setTimeout(function() {
+        btn.disabled = false;
+        btn.innerText = 'Proses Sekarang';
+        closeModal('modalAksiPeminjaman');
+        showToast('Aksi peminjaman berhasil diproses (Demo)', 'success');
+        fetchPeminjamanData();
+        fetchAsetData();
+      }, 400);
+    }
+  }
+</script>
