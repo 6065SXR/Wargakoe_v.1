@@ -1,0 +1,307 @@
+<script>
+  var currentUser = null;
+  var currentTab = 'dashboard';
+  var debounceTimerWarga = null;
+  var debounceTimerIuran = null;
+  var currentFamilyNoKk = '';
+
+  window.onload = function() {
+    setTimeout(function() {
+      var splash = document.getElementById('splashScreen');
+      if (splash) {
+        splash.classList.add('opacity-0');
+        setTimeout(function() {
+          splash.classList.add('hidden');
+          checkInitialAuth();
+        }, 500);
+      }
+    }, 1500);
+
+    var dateNow = new Date();
+    var months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    var currentMonthStr = months[dateNow.getMonth()];
+    var currentYearStr = String(dateNow.getFullYear());
+    var monthYearStr = currentMonthStr + ' ' + currentYearStr;
+
+    var curLbl = document.getElementById('currentMonthYearLabel');
+    if (curLbl) curLbl.innerText = monthYearStr;
+
+    var kMonth = document.getElementById('kasRtFilterBulan');
+    if (kMonth) kMonth.value = currentMonthStr;
+    var kYear = document.getElementById('kasRtFilterTahun');
+    if (kYear) kYear.value = currentYearStr;
+  };
+
+  function checkInitialAuth() {
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+      showToast('Mode Canvas Demo', 'info');
+      currentUser = {
+        noKk: '3171010000000001',
+        noKtp: '3171010101850001',
+        nama: 'Budi Santoso',
+        noHp: '081234567890',
+        role: 'Super Admin',
+        statusUser: 'Pengurus RT',
+        alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim Perdana Kusuma'
+      };
+      showMainDashboard();
+      return;
+    }
+    showAuthCard('login');
+  }
+
+  function showAuthCard(cardType) {
+    document.getElementById('authContainer').classList.remove('hidden');
+    document.getElementById('mainDashboard').classList.add('hidden');
+
+    if (cardType === 'login') {
+      document.getElementById('loginCard').classList.remove('hidden');
+      document.getElementById('registerCard').classList.add('hidden');
+    } else {
+      document.getElementById('loginCard').classList.add('hidden');
+      document.getElementById('registerCard').classList.remove('hidden');
+    }
+  }
+
+  function toggleRoleSelect(val) {
+    var container = document.getElementById('rolePengurusContainer');
+    if (val === 'Pengurus RT') container.classList.remove('hidden');
+    else container.classList.add('hidden');
+  }
+
+  function calculateAgeRealtime(birthDateStr, displayInputId, valueInputId) {
+    if (!birthDateStr) return;
+    var birth = new Date(birthDateStr);
+    var today = new Date();
+    var age = today.getFullYear() - birth.getFullYear();
+    var m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    age = Math.max(0, age);
+    var disp = document.getElementById(displayInputId);
+    var val = document.getElementById(valueInputId);
+    if (disp) disp.value = age + ' Tahun';
+    if (val) val.value = String(age);
+  }
+
+  function handleLogin() {
+    var noHp = document.getElementById('loginNoHp').value.trim();
+    var password = document.getElementById('loginPassword').value.trim();
+    var btn = document.getElementById('btnLogin');
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Memverifikasi...</span>';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>Masuk Sekarang</span><i class="fa-solid fa-arrow-right"></i>';
+          if (res && res.success) {
+            currentUser = res.user;
+            showToast(res.message, 'success');
+            showMainDashboard();
+          } else {
+            showToast(res ? res.message : 'Login gagal.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.innerHTML = '<span>Masuk Sekarang</span><i class="fa-solid fa-arrow-right"></i>';
+          showToast('Kesalahan server: ' + err.toString(), 'error');
+        })
+        .loginUser(noHp, password);
+    } else {
+      setTimeout(function() {
+        btn.disabled = false;
+        btn.innerHTML = '<span>Masuk Sekarang</span><i class="fa-solid fa-arrow-right"></i>';
+        currentUser = {
+          noKk: '3171010000000001',
+          nama: 'Budi Santoso',
+          role: 'Super Admin',
+          statusUser: 'Pengurus RT',
+          alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim'
+        };
+        showToast('Login Demo Berhasil', 'success');
+        showMainDashboard();
+      }, 600);
+    }
+  }
+
+  function handleRegister() {
+    var statusUser = document.querySelector('input[name="regStatusUser"]:checked').value;
+    var role = statusUser === 'Pengurus RT' ? document.getElementById('regRole').value : 'Warga';
+
+    var payload = {
+      statusUser: statusUser,
+      role: role,
+      nama: document.getElementById('regNama').value,
+      noKk: document.getElementById('regNoKk').value,
+      noKtp: document.getElementById('regNoKtp').value,
+      tanggalLahir: document.getElementById('regTglLahir').value,
+      umur: document.getElementById('regUmurVal').value,
+      jenisKelamin: document.getElementById('regJenisKelamin').value,
+      statusKeluarga: document.getElementById('regStatusKeluarga').value,
+      statusRumah: document.getElementById('regStatusRumah').value,
+      pendidikan: document.getElementById('regPendidikan').value,
+      pekerjaan: document.getElementById('regPekerjaan').value,
+      alamat: document.getElementById('regAlamat').value,
+      noHp: document.getElementById('regNoHp').value,
+      password: document.getElementById('regPassword').value
+    };
+
+    var btn = document.getElementById('btnRegister');
+    btn.disabled = true;
+    btn.innerText = 'Mendaftarkan...';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          btn.disabled = false;
+          btn.innerText = 'Daftarkan Data Warga';
+          if (res && res.success) {
+            showToast(res.message, 'success');
+            showAuthCard('login');
+          } else {
+            showToast(res ? res.message : 'Registrasi gagal.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.innerText = 'Daftarkan Data Warga';
+          showToast('Kesalahan server: ' + err.toString(), 'error');
+        })
+        .registerUser(payload);
+    } else {
+      setTimeout(function() {
+        btn.disabled = false;
+        btn.innerText = 'Daftarkan Data Warga';
+        showToast('Registrasi Demo Berhasil.', 'success');
+        showAuthCard('login');
+      }, 600);
+    }
+  }
+
+  function showMainDashboard() {
+    document.getElementById('authContainer').classList.add('hidden');
+    document.getElementById('mainDashboard').classList.remove('hidden');
+
+    if (currentUser) {
+      document.getElementById('userNameDesktop').innerText = currentUser.nama || 'Warga';
+      document.getElementById('userRoleDesktop').innerText = currentUser.role || 'Warga';
+      document.getElementById('userRoleMobile').innerText = currentUser.role || 'Warga';
+      document.getElementById('userAvatarDesktop').innerText = (currentUser.nama || 'U').charAt(0).toUpperCase();
+      document.getElementById('welcomeBannerText').innerText = 'Halo, ' + currentUser.nama + '!';
+
+      var isPengurus = (currentUser.role === 'Super Admin' || currentUser.statusUser === 'Pengurus RT' || currentUser.role === 'Pengurus RT' || currentUser.role === 'Ketua RT' || currentUser.role === 'Bendahara' || currentUser.role === 'Sekretaris');
+
+      var btnPengeluaranContainer = document.getElementById('btnPengeluaranRutinContainer');
+      if (btnPengeluaranContainer) {
+        if (isPengurus) btnPengeluaranContainer.classList.remove('hidden');
+        else btnPengeluaranContainer.classList.add('hidden');
+      }
+
+      var madingAction = document.getElementById('madingActionContainer');
+      if (madingAction) {
+        if (!isPengurus) madingAction.classList.add('hidden');
+        else madingAction.classList.remove('hidden');
+      }
+
+      var btnImportContainer = document.getElementById('btnImportWargaContainer');
+      if (btnImportContainer) {
+        if (currentUser.role === 'Super Admin') btnImportContainer.classList.remove('hidden');
+        else btnImportContainer.classList.add('hidden');
+      }
+    }
+
+    switchTab('dashboard');
+    refreshData();
+  }
+
+  function switchTab(tabId) {
+    currentTab = tabId;
+    var tabs = ['dashboard', 'warga', 'iuran', 'keluarga', 'mading'];
+    for (var i = 0; i < tabs.length; i++) {
+      var t = tabs[i];
+      var view = document.getElementById('tab-' + t);
+      var navD = document.getElementById('sideNav-' + t);
+      var navM = document.getElementById('mobileNav-' + t);
+
+      if (t === tabId) {
+        if (view) view.classList.remove('hidden');
+        if (navD) navD.classList.add('nav-item-active');
+        if (navM) {
+          navM.classList.add('text-brand-indigo', 'font-bold');
+          navM.classList.remove('text-slate-400');
+        }
+      } else {
+        if (view) view.classList.add('hidden');
+        if (navD) navD.classList.remove('nav-item-active');
+        if (navM) {
+          navM.classList.remove('text-brand-indigo', 'font-bold');
+          navM.classList.add('text-slate-400');
+        }
+      }
+    }
+
+    if (tabId === 'warga') fetchWargaData(0);
+    else if (tabId === 'iuran') fetchIuranData(0);
+    else if (tabId === 'keluarga') fetchFamilyData();
+    else if (tabId === 'mading') fetchMadingData();
+    else if (tabId === 'dashboard') fetchKasRtDetails();
+  }
+
+  function renderPaginationButtons(containerId, currentPage, totalPages, fetchFnName) {
+    var container = document.getElementById(containerId);
+    container.innerHTML = '';
+    if (totalPages <= 1) return;
+    var prevBtn = document.createElement('button');
+    prevBtn.className = 'px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 disabled:opacity-40';
+    prevBtn.disabled = currentPage <= 1;
+    prevBtn.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
+    prevBtn.onclick = function() { window[fetchFnName]((currentPage - 2) * 10); };
+    container.appendChild(prevBtn);
+    var nextBtn = document.createElement('button');
+    nextBtn.className = 'px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 disabled:opacity-40';
+    nextBtn.disabled = currentPage >= totalPages;
+    nextBtn.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+    nextBtn.onclick = function() { window[fetchFnName](currentPage * 10); };
+    container.appendChild(nextBtn);
+  }
+
+  function closeModal(modalId) {
+    var m = document.getElementById(modalId);
+    if (m) m.classList.add('hidden');
+  }
+
+  function handleLogout() {
+    currentUser = null;
+    document.getElementById('loginNoHp').value = '';
+    document.getElementById('loginPassword').value = '';
+    showToast('Anda telah keluar dari aplikasi.', 'info');
+    showAuthCard('login');
+  }
+
+  function showToast(message, type) {
+    var toast = document.getElementById('toastNotification');
+    var msg = document.getElementById('toastMessage');
+    var icon = document.getElementById('toastIcon');
+    msg.innerText = message;
+
+    if (type === 'success') icon.className = 'fa-solid fa-circle-check text-brand-neon text-base';
+    else if (type === 'error') icon.className = 'fa-solid fa-circle-exclamation text-rose-400 text-base';
+    else icon.className = 'fa-solid fa-circle-info text-brand-cyan text-base';
+
+    toast.classList.remove('translate-y-[-150%]');
+    toast.classList.add('translate-y-0');
+
+    setTimeout(function() {
+      toast.classList.remove('translate-y-0');
+      toast.classList.add('translate-y-[-150%]');
+    }, 3500);
+  }
+
+  function formatRupiah(val) {
+    var number = parseInt(val, 10) || 0;
+    return 'Rp ' + number.toLocaleString('id-ID');
+  }
+</script>
