@@ -38,7 +38,21 @@
           ],
           madingTerbaru: [
             { judul: 'Kerja Bakti Bulanan RT 010', tanggalKegiatan: '10 September 2026', note: 'Harap hadir membawa alat kebersihan.', pembuat: 'Budi Santoso' }
-          ]
+          ],
+          upcomingRonda: {
+            idJadwal: 'RND-0001',
+            namaRegu: 'Regu Alpha (Pos Utama)',
+            tanggalRonda: '2026-09-05',
+            ketuaRegu: 'Budi Santoso',
+            lokasiPos: 'Pos Ronda Utama RT 010',
+            jamShift: '22.00 - 03.00 WIB',
+            isToday: true,
+            alreadyAbsen: false,
+            daftarWarga: [
+              { noKk: '3171010000000001', nama: 'Budi Santoso', noHp: '081234567890', peran: 'Ketua Regu' },
+              { noKk: '3171010000000003', nama: 'Agus Setiawan', noHp: '081234567892', peran: 'Anggota' }
+            ]
+          }
         });
       }, 400);
     }
@@ -80,6 +94,37 @@
     document.getElementById('demoLansiaBar').style.width = lPct + '%';
 
     var isPengurus = currentUser && (currentUser.role === 'Super Admin' || currentUser.statusUser === 'Pengurus RT' || currentUser.role === 'Pengurus RT' || currentUser.role === 'Ketua RT' || currentUser.role === 'Bendahara' || currentUser.role === 'Sekretaris');
+
+    // BANNER JADWAL RONDA WARGA SAYA
+    var rondaBanner = document.getElementById('wargaRondaNotificationBanner');
+    var badgeRondaDesktop = document.getElementById('badgeRondaActiveDesktop');
+
+    if (stats.upcomingRonda) {
+      if (rondaBanner) {
+        rondaBanner.classList.remove('hidden');
+        document.getElementById('rondaBannerDate').innerText = stats.upcomingRonda.tanggalRonda;
+        document.getElementById('rondaBannerTitle').innerText = 'Jadwal Ronda Malam Minggu: ' + stats.upcomingRonda.namaRegu;
+        document.getElementById('rondaBannerDesc').innerText = 'Ketua Regu: ' + stats.upcomingRonda.ketuaRegu + ' • ' + stats.upcomingRonda.jamShift + ' di ' + stats.upcomingRonda.lokasiPos;
+
+        if (stats.upcomingRonda.alreadyAbsen) {
+          document.getElementById('rondaBannerBadge').className = 'px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-emerald-400 text-slate-900';
+          document.getElementById('rondaBannerBadge').innerText = 'Sudah Absen Selfie';
+          document.getElementById('rondaBannerBtnText').innerText = 'Lihat Detail Regu';
+        } else if (stats.upcomingRonda.isToday) {
+          document.getElementById('rondaBannerBadge').className = 'px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-rose-500 text-white animate-pulse';
+          document.getElementById('rondaBannerBadge').innerText = 'Hari Ini Ronda!';
+          document.getElementById('rondaBannerBtnText').innerText = 'Absen Selfie Sekarang';
+        } else {
+          document.getElementById('rondaBannerBadge').className = 'px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-brand-neon text-brand-dark';
+          document.getElementById('rondaBannerBadge').innerText = 'Malam Minggu Mendatang';
+          document.getElementById('rondaBannerBtnText').innerText = 'Lihat Anggota Regu';
+        }
+      }
+      if (badgeRondaDesktop) badgeRondaDesktop.classList.remove('hidden');
+    } else {
+      if (rondaBanner) rondaBanner.classList.add('hidden');
+      if (badgeRondaDesktop) badgeRondaDesktop.classList.add('hidden');
+    }
 
     // Notifikasi Peminjaman Aset Baru untuk Pengurus RT
     var pengurusBanner = document.getElementById('pengurusAsetPendingBanner');
@@ -134,123 +179,6 @@
           dashMading.appendChild(card);
         }
       }
-    }
-  }
-
-  function fetchKasRtDetails() {
-    var bulanSelect = document.getElementById('kasRtFilterBulan');
-    var tahunSelect = document.getElementById('kasRtFilterTahun');
-    if (!bulanSelect || !tahunSelect) return;
-
-    var bulanTahun = bulanSelect.value + ' ' + tahunSelect.value;
-    var tbody = document.getElementById('kasRtTableBody');
-    tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat rincian Kas RT...</td></tr>';
-
-    if (typeof google !== 'undefined' && google.script && google.script.run) {
-      google.script.run
-        .withSuccessHandler(function(res) {
-          if (res && res.success) renderKasRtTable(res);
-        })
-        .getKasRtDetails(bulanTahun);
-    } else {
-      setTimeout(function() {
-        renderKasRtTable({
-          data: [
-            { idKas: 'KAS-0001', tanggal: '01/09/2026', jenisKas: 'Pemasukan', kategori: 'Iuran Kas', keterangan: 'Penerimaan Iuran Kas Bulanan RT 010', nominal: 100000, bulanTahun: bulanTahun },
-            { idKas: 'KAS-0002', tanggal: '03/09/2026', jenisKas: 'Pengeluaran', kategori: 'Iuran Kas', keterangan: 'Pembelian Sapu &amp; Alat Kebersihan Pos Ronda', nominal: 35000, bulanTahun: bulanTahun }
-          ],
-          totalPemasukan: 100000,
-          totalPengeluaran: 35000,
-          sisaSaldo: 65000
-        });
-      }, 300);
-    }
-  }
-
-  function renderKasRtTable(res) {
-    var tbody = document.getElementById('kasRtTableBody');
-    tbody.innerHTML = '';
-
-    document.getElementById('kasRtTotalPemasukan').innerText = formatRupiah(res.totalPemasukan || 0);
-    document.getElementById('kasRtTotalPengeluaran').innerText = formatRupiah(res.totalPengeluaran || 0);
-    document.getElementById('kasRtSisaSaldo').innerText = formatRupiah(res.sisaSaldo || 0);
-
-    if (!res.data || res.data.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-400">Belum ada catatan mutasi kas pada bulan ini.</td></tr>';
-      return;
-    }
-
-    for (var i = 0; i < res.data.length; i++) {
-      var k = res.data[i];
-      var tr = document.createElement('tr');
-      tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
-
-      var badgeJenis = k.jenisKas === 'Pemasukan'
-        ? '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800"><i class="fa-solid fa-arrow-down mr-1"></i>Pemasukan</span>'
-        : '<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800"><i class="fa-solid fa-arrow-up mr-1"></i>Pengeluaran</span>';
-
-      var nominalColor = k.jenisKas === 'Pemasukan' ? 'text-emerald-700' : 'text-rose-600';
-      var nominalPrefix = k.jenisKas === 'Pemasukan' ? '+ ' : '- ';
-
-      tr.innerHTML = 
-        '<td class="p-3 font-semibold text-slate-700 whitespace-nowrap">' + k.tanggal + '</td>' +
-        '<td class="p-3"><div>' + badgeJenis + '</div><span class="text-[10px] text-slate-400 font-medium mt-0.5 block">' + k.kategori + '</span></td>' +
-        '<td class="p-3 text-slate-700 font-medium">' + k.keterangan + '</td>' +
-        '<td class="p-3 text-right font-bold ' + nominalColor + ' whitespace-nowrap">' + nominalPrefix + formatRupiah(k.nominal) + '</td>';
-
-      tbody.appendChild(tr);
-    }
-  }
-
-  function openModalPengeluaranRutin() {
-    var dateNow = new Date();
-    var dayStr = ('0' + dateNow.getDate()).slice(-2);
-    var monthStr = ('0' + (dateNow.getMonth() + 1)).slice(-2);
-    var months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-
-    document.getElementById('pengeluaranTanggal').value = dateNow.getFullYear() + '-' + monthStr + '-' + dayStr;
-    document.getElementById('pengeluaranBulanTahun').value = months[dateNow.getMonth()] + ' ' + dateNow.getFullYear();
-    document.getElementById('pengeluaranKategori').value = 'Iuran Kas';
-    document.getElementById('pengeluaranKeterangan').value = '';
-    document.getElementById('pengeluaranNominal').value = '';
-
-    document.getElementById('modalPengeluaranRutin').classList.remove('hidden');
-  }
-
-  function handleSavePengeluaranRutin() {
-    var payload = {
-      tanggal: document.getElementById('pengeluaranTanggal').value,
-      bulanTahun: document.getElementById('pengeluaranBulanTahun').value,
-      kategori: document.getElementById('pengeluaranKategori').value,
-      keterangan: document.getElementById('pengeluaranKeterangan').value,
-      nominal: document.getElementById('pengeluaranNominal').value
-    };
-
-    var btn = document.getElementById('btnSavePengeluaranRutin');
-    btn.disabled = true;
-    btn.innerText = 'Menyimpan...';
-
-    if (typeof google !== 'undefined' && google.script && google.script.run) {
-      google.script.run.withSuccessHandler(function(res) {
-        btn.disabled = false;
-        btn.innerText = 'Simpan Pengeluaran';
-        closeModal('modalPengeluaranRutin');
-        if (res && res.success) {
-          showToast(res.message, 'success');
-          fetchKasRtDetails();
-          refreshData();
-        } else {
-          showToast(res ? res.message : 'Gagal.', 'error');
-        }
-      }).savePengeluaranRutin(payload);
-    } else {
-      setTimeout(function() {
-        btn.disabled = false;
-        btn.innerText = 'Simpan Pengeluaran';
-        closeModal('modalPengeluaranRutin');
-        showToast('Pengeluaran rutin dicatat! (Demo)', 'success');
-        fetchKasRtDetails();
-      }, 400);
     }
   }
 </script>
