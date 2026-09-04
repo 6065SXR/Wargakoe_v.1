@@ -24,6 +24,7 @@
           kasTerkumpul: 1000000,
           totalTerkumpul: 1250000,
           totalMenunggu: 50000,
+          pendingAsetCount: 1,
           balita: 3,
           remaja: 6,
           dewasa: 12,
@@ -78,6 +79,30 @@
     document.getElementById('demoLansiaVal').innerText = (stats.lansia || 0) + ' Jiwa (' + lPct + '%)';
     document.getElementById('demoLansiaBar').style.width = lPct + '%';
 
+    var isPengurus = currentUser && (currentUser.role === 'Super Admin' || currentUser.statusUser === 'Pengurus RT' || currentUser.role === 'Pengurus RT' || currentUser.role === 'Ketua RT' || currentUser.role === 'Bendahara' || currentUser.role === 'Sekretaris');
+
+    // Notifikasi Peminjaman Aset Baru untuk Pengurus RT
+    var pengurusBanner = document.getElementById('pengurusAsetPendingBanner');
+    var badgeDesktop = document.getElementById('badgeAsetPendingDesktop');
+    var badgeMobile = document.getElementById('badgeAsetPendingMobile');
+
+    if (isPengurus && stats.pendingAsetCount > 0) {
+      if (pengurusBanner) {
+        pengurusBanner.classList.remove('hidden');
+        document.getElementById('pengurusAsetPendingText').innerText = 'Terdapat ' + stats.pendingAsetCount + ' permohonan peminjaman aset warga yang menunggu verifikasi & persetujuan.';
+      }
+      if (badgeDesktop) {
+        badgeDesktop.innerText = stats.pendingAsetCount;
+        badgeDesktop.classList.remove('hidden');
+      }
+      if (badgeMobile) badgeMobile.classList.remove('hidden');
+    } else {
+      if (pengurusBanner) pengurusBanner.classList.add('hidden');
+      if (badgeDesktop) badgeDesktop.classList.add('hidden');
+      if (badgeMobile) badgeMobile.classList.add('hidden');
+    }
+
+    // Banner tagihan iuran belum bayar untuk warga
     var pBanner = document.getElementById('wargaPendingBanner');
     if (pBanner) {
       var isSuperAdmin = currentUser && currentUser.role === 'Super Admin';
