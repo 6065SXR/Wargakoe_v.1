@@ -80,6 +80,39 @@ var DB_SCHEMA = {
       'Bulan_Tahun',
       'Created_At'
     ]
+  },
+  ASET: {
+    name: 'ASET',
+    headers: [
+      'ID_Aset',
+      'Nama_Aset',
+      'Kategori',
+      'Jumlah_Total',
+      'Jumlah_Tersedia',
+      'Kondisi',
+      'Lokasi_Penyimpanan',
+      'Keterangan',
+      'Created_At'
+    ]
+  },
+  PEMINJAMAN_ASET: {
+    name: 'PEMINJAMAN_ASET',
+    headers: [
+      'ID_Pinjam',
+      'ID_Aset',
+      'Nama_Aset',
+      'No_KK',
+      'Nama_Peminjam',
+      'No_HP',
+      'Jumlah_Pinjam',
+      'Tanggal_Pinjam',
+      'Tanggal_Kembali',
+      'Keperluan',
+      'Status',
+      'Catatan_Pengurus',
+      'Disetujui_Oleh',
+      'Created_At'
+    ]
   }
 };
 
@@ -179,7 +212,6 @@ function repairIuranSheet_(ss) {
       var idIuran = row[0] || '';
       var colB = row[1] || '';
 
-      // Hapus & lewati total data legacy yang memiliki nomor KWI-IUR-
       if (idIuran.indexOf('KWI-IUR-') === 0 || colB.indexOf('KWI-IUR-') === 0) {
         continue;
       }
@@ -295,5 +327,26 @@ function seedInitialData_(ss) {
       ['KAS-0002', '03/09/2026', 'Pengeluaran', 'Iuran Kas', 'Pembelian Alat Kebersihan Pos Ronda RT 010', '35000', curBulanYear, nowStr]
     ];
     kasSheet.getRange(2, 1, dummyKas.length, dummyKas[0].length).setValues(dummyKas);
+  }
+
+  // Inisialisasi awal Master Aset
+  var asetSheet = ss.getSheetByName(DB_SCHEMA.ASET.name);
+  if (asetSheet && asetSheet.getLastRow() <= 1) {
+    var dummyAset = [
+      ['AST-0001', 'Tenda Terpal Lipat (3x3 M)', 'Peralatan Tenda', '4', '4', 'Sangat Baik', 'Gudang Pos Ronda RT 010', 'Lengkap dengan besi tiang', nowStr],
+      ['AST-0002', 'Kursi Plastik Hijau', 'Peralatan Duduk', '50', '50', 'Baik', 'Gudang Pos Ronda RT 010', 'Merk Napolly kuat', nowStr],
+      ['AST-0003', 'Sound System Portabel Wireless', 'Elektronik / Audio', '2', '2', 'Sangat Baik', 'Rumah Ketua RT (Bpk Budi)', 'Include 2 Mic Wireless & Charger', nowStr],
+      ['AST-0004', 'Mesin Rumput Gendong', 'Peralatan Kebersihan', '1', '1', 'Baik', 'Gudang Pos Ronda RT 010', 'Bahan bakar bensin campur 2 tak', nowStr]
+    ];
+    asetSheet.getRange(2, 1, dummyAset.length, dummyAset[0].length).setValues(dummyAset);
+  }
+
+  // Inisialisasi awal Riwayat Peminjaman Aset
+  var pinjamSheet = ss.getSheetByName(DB_SCHEMA.PEMINJAMAN_ASET.name);
+  if (pinjamSheet && pinjamSheet.getLastRow() <= 1) {
+    var dummyPinjam = [
+      ['PJM-0001', 'AST-0002', 'Kursi Plastik Hijau', '3171010000000003', 'Agus Setiawan', '081234567892', '20', '10/09/2026', '12/09/2026', 'Acara syukuran aqiqah di rumah', 'Menunggu', '-', '-', nowStr]
+    ];
+    pinjamSheet.getRange(2, 1, dummyPinjam.length, dummyPinjam[0].length).setValues(dummyPinjam);
   }
 }
