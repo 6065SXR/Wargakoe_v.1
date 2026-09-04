@@ -308,6 +308,170 @@
   </div>
 </div>
 
+<!-- ==================================================================== -->
+<!-- MODAL BARU: PINJAM ASET WARGA -->
+<!-- ==================================================================== -->
+<div id="modalPinjamAset" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+  <div class="dashboard-card w-full max-w-md p-6 relative">
+    <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+      <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+        <i class="fa-solid fa-hand-holding-box text-brand-pink"></i>
+        <span>Form Permohonan Pinjam Aset RT</span>
+      </h3>
+      <button onclick="closeModal('modalPinjamAset')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-base"></i></button>
+    </div>
+    <form id="formPinjamAset" onsubmit="event.preventDefault(); handleSavePinjamAset();" class="space-y-3.5 text-xs">
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Nama Peminjam</label>
+        <input type="text" id="pinjamNamaWarga" readonly class="input-pill w-full bg-slate-100 font-bold text-slate-600 cursor-not-allowed">
+      </div>
+
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Pilih Barang / Aset RT</label>
+        <select id="pinjamPilihAset" onchange="updatePinjamMaxQty()" required class="input-pill w-full font-bold text-slate-700"></select>
+        <p class="text-[10px] text-slate-500 mt-1 font-medium" id="pinjamInfoStok">Stok tersedia: 0</p>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Jumlah Pinjam</label>
+          <input type="number" id="pinjamQty" min="1" required value="1" class="input-pill w-full font-bold text-brand-indigo">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">No. Kontak / HP</label>
+          <input type="tel" id="pinjamNoHp" required placeholder="081234..." class="input-pill w-full">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Tanggal Mulai Pinjam</label>
+          <input type="date" id="pinjamTglMulai" required class="input-pill w-full">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Rencana Pengembalian</label>
+          <input type="date" id="pinjamTglKembali" required class="input-pill w-full">
+        </div>
+      </div>
+
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Keperluan Peminjaman</label>
+        <textarea id="pinjamKeperluan" rows="3" required placeholder="Contoh: Acara tahlilan / syukuran pernikahan di rumah" class="w-full p-3 rounded-2xl border border-slate-200 outline-none focus:border-brand-amber text-xs"></textarea>
+      </div>
+
+      <div class="pt-3 flex items-center justify-end gap-2">
+        <button type="button" onclick="closeModal('modalPinjamAset')" class="px-4 py-2.5 rounded-full border border-slate-200 text-slate-600 font-bold">Batal</button>
+        <button type="submit" id="btnSubmitPinjamAset" class="px-5 py-2.5 rounded-full bg-brand-pink text-white font-bold shadow-md hover:opacity-95">Ajukan Peminjaman</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ==================================================================== -->
+<!-- MODAL BARU: TAMBAH / EDIT ASET RT (PENGURUS ONLY) -->
+<!-- ==================================================================== -->
+<div id="modalKelolaAset" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+  <div class="dashboard-card w-full max-w-md p-6 relative">
+    <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+      <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2" id="modalKelolaAsetTitle">
+        <i class="fa-solid fa-boxes-stacked text-brand-indigo"></i>
+        <span>Tambah Data Aset RT</span>
+      </h3>
+      <button onclick="closeModal('modalKelolaAset')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-base"></i></button>
+    </div>
+    <form id="formKelolaAset" onsubmit="event.preventDefault(); handleSaveKelolaAset();" class="space-y-3 text-xs">
+      <input type="hidden" id="formAsetId" value="">
+
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Nama Barang / Aset</label>
+        <input type="text" id="formAsetNama" required placeholder="Contoh: Tenda Terpal Lipat (3x3 M)" class="input-pill w-full">
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Kategori Barang</label>
+          <select id="formAsetKategori" class="input-pill w-full">
+            <option value="Peralatan Tenda">Peralatan Tenda</option>
+            <option value="Peralatan Duduk">Peralatan Duduk (Kursi/Meja)</option>
+            <option value="Elektronik / Audio">Elektronik / Audio (Sound System)</option>
+            <option value="Peralatan Kebersihan">Peralatan Kebersihan</option>
+            <option value="Peralatan Masak">Peralatan Masak / Konsumsi</option>
+            <option value="Peralatan Umum">Peralatan Umum</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Jumlah Total Unit</label>
+          <input type="number" id="formAsetTotal" min="1" required placeholder="1" class="input-pill w-full font-bold">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Kondisi Barang</label>
+          <select id="formAsetKondisi" class="input-pill w-full">
+            <option value="Sangat Baik">Sangat Baik (Prima)</option>
+            <option value="Baik" selected>Baik (Siap Pakai)</option>
+            <option value="Rusak Ringan">Rusak Ringan</option>
+            <option value="Dalam Perbaikan">Dalam Perbaikan</option>
+          </select>
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Lokasi Penyimpanan</label>
+          <input type="text" id="formAsetLokasi" required placeholder="Gudang Pos Ronda RT 010" class="input-pill w-full">
+        </div>
+      </div>
+
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Keterangan / Kelengkapan Barang</label>
+        <textarea id="formAsetKeterangan" rows="3" placeholder="Contoh: Termasuk 2 microphone wireless dan kabel charger..." class="w-full p-3 rounded-2xl border border-slate-200 outline-none focus:border-brand-amber text-xs"></textarea>
+      </div>
+
+      <div class="pt-3 flex items-center justify-end gap-2">
+        <button type="button" onclick="closeModal('modalKelolaAset')" class="px-4 py-2.5 rounded-full border border-slate-200 text-slate-600 font-bold">Batal</button>
+        <button type="submit" id="btnSaveKelolaAset" class="px-5 py-2.5 rounded-full bg-brand-indigo text-white font-bold shadow-md hover:opacity-95">Simpan Data Aset</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ==================================================================== -->
+<!-- MODAL BARU: AKSI VERIFIKASI PEMINJAMAN (SETUJUI, TOLAK, KEMBALI) -->
+<!-- ==================================================================== -->
+<div id="modalAksiPeminjaman" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+  <div class="dashboard-card w-full max-w-md p-6 relative">
+    <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+      <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2" id="modalAksiPeminjamanTitle">
+        <i class="fa-solid fa-stamp text-brand-indigo"></i>
+        <span>Verifikasi Peminjaman Aset</span>
+      </h3>
+      <button onclick="closeModal('modalAksiPeminjaman')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-base"></i></button>
+    </div>
+
+    <div class="space-y-3.5 text-xs">
+      <input type="hidden" id="aksiPinjamId" value="">
+      <input type="hidden" id="aksiPinjamAction" value="">
+
+      <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1 text-slate-700">
+        <p><strong>Peminjam:</strong> <span id="aksiPinjamNamaWarga">-</span></p>
+        <p><strong>Barang:</strong> <span id="aksiPinjamNamaAset">-</span></p>
+        <p id="aksiPinjamDeskripsi" class="text-slate-500 text-[11px] pt-1 border-t border-slate-200"></p>
+      </div>
+
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Catatan Pengurus (Opsional)</label>
+        <textarea id="aksiPinjamCatatan" rows="3" placeholder="Contoh: Harap dijaga kebersihannya dan dikembalikan tepat waktu." class="w-full p-3 rounded-2xl border border-slate-200 outline-none focus:border-brand-amber text-xs"></textarea>
+      </div>
+
+      <div class="pt-2 flex items-center justify-end gap-2">
+        <button type="button" onclick="closeModal('modalAksiPeminjaman')" class="px-4 py-2.5 rounded-full border border-slate-200 text-slate-600 font-bold">Batal</button>
+        <button type="button" id="btnSubmitAksiPeminjaman" onclick="submitAksiPeminjaman()" class="px-5 py-2.5 rounded-full font-bold shadow-md text-white">
+          Proses Sekarang
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="toastNotification" class="fixed top-4 right-4 z-50 transform translate-y-[-150%] transition-transform duration-300 pointer-events-none">
   <div id="toastCard" class="flex items-center gap-3 px-4 py-3 rounded-2xl bg-brand-dark text-white shadow-2xl border border-white/20 text-xs font-medium max-w-sm pointer-events-auto">
     <i id="toastIcon" class="fa-solid fa-circle-check text-brand-neon text-base"></i>
