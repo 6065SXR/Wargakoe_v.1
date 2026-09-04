@@ -1,0 +1,275 @@
+<script>
+  function fetchFamilyData(targetKk) {
+    var noKk = targetKk || (currentUser ? currentUser.noKk : '');
+    if (!noKk) return;
+    currentFamilyNoKk = noKk;
+
+    var container = document.getElementById('anggotaKeluargaContainer');
+    container.innerHTML = '<div class="col-span-3 text-center p-6 text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat...</div>';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(function(res) {
+        if (res && res.success) renderFamilyDetails(res.data);
+      }).getFamilyDetails(noKk);
+    } else {
+      setTimeout(function() {
+        renderFamilyDetails({
+          kepalaKeluarga: { nama: 'Budi Santoso', noKk: noKk, alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim' },
+          anggota: [{ idAnggota: 'AGT-0001', noKk: noKk, namaAnggota: 'Dewi Lestari', hubunganKeluarga: 'Istri', tanggalLahir: '12/04/1988', umur: '36', jenisKelamin: 'Perempuan' }]
+        });
+      }, 300);
+    }
+  }
+
+  function renderFamilyDetails(data) {
+    if (!data) return;
+    if (data.kepalaKeluarga) {
+      currentFamilyNoKk = data.kepalaKeluarga.noKk;
+      document.getElementById('myFamilyHeadName').innerText = data.kepalaKeluarga.nama;
+      document.getElementById('myFamilyKkNumber').innerText = data.kepalaKeluarga.noKk;
+      document.getElementById('myFamilyAddress').innerText = data.kepalaKeluarga.alamat || '-';
+    }
+    var container = document.getElementById('anggotaKeluargaContainer');
+    container.innerHTML = '';
+    if (!data.anggota || data.anggota.length === 0) {
+      container.innerHTML = '<div class="col-span-3 p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs">Belum ada anggota keluarga tambahan.</div>';
+      return;
+    }
+    for (var i = 0; i < data.anggota.length; i++) {
+      var agt = data.anggota[i];
+      var card = document.createElement('div');
+      card.className = 'p-4 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-between hover:shadow-md transition';
+      var icon = agt.jenisKelamin === 'Perempuan' ? 'fa-female text-pink-500' : 'fa-male text-indigo-500';
+
+      card.innerHTML = 
+        '<div class="flex items-center gap-3">' +
+          '<div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-lg"><i class="fa-solid ' + icon + '"></i></div>' +
+          '<div><h5 class="text-xs font-bold text-slate-800">' + agt.namaAnggota + '</h5><p class="text-[11px] text-slate-500">' + agt.hubunganKeluarga + ' • ' + agt.umur + ' Thn</p></div>' +
+        '</div>' +
+        '<div class="flex items-center gap-1">' +
+          '<button onclick="editAnggota(\'' + agt.idAnggota + '\', \'' + encodeURIComponent(agt.namaAnggota) + '\', \'' + encodeURIComponent(agt.hubunganKeluarga) + '\', \'' + encodeURIComponent(agt.tanggalLahir) + '\', \'' + agt.umur + '\', \'' + agt.jenisKelamin + '\')" class="p-2 rounded-lg text-slate-400 hover:text-brand-indigo hover:bg-slate-100 transition text-xs"><i class="fa-solid fa-pen-to-square"></i></button>' +
+          '<button onclick="handleDeleteAnggota(\'' + agt.idAnggota + '\')" class="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition text-xs"><i class="fa-solid fa-trash-can"></i></button>' +
+        '</div>';
+      container.appendChild(card);
+    }
+  }
+
+  function openModalTambahAnggota() {
+    document.getElementById('formAnggotaId').value = '';
+    document.getElementById('formAnggotaKk').value = currentFamilyNoKk || (currentUser ? currentUser.noKk : '');
+    document.getElementById('formAnggotaNama').value = '';
+    document.getElementById('formAnggotaHubungan').value = 'Istri';
+    document.getElementById('formAnggotaTglLahir').value = '';
+    document.getElementById('formAnggotaUmurDisplay').value = '';
+    document.getElementById('formAnggotaUmurVal').value = '0';
+    document.getElementById('formAnggotaGender').value = 'Perempuan';
+    document.getElementById('modalAnggotaTitle').innerText = 'Tambah Anggota Keluarga';
+    document.getElementById('modalAnggota').classList.remove('hidden');
+  }
+
+  function editAnggota(id, namaEnc, hubEnc, tglEnc, umur, gender) {
+    document.getElementById('formAnggotaId').value = id;
+    document.getElementById('formAnggotaKk').value = currentFamilyNoKk || (currentUser ? currentUser.noKk : '');
+    document.getElementById('formAnggotaNama').value = decodeURIComponent(namaEnc || '');
+    document.getElementById('formAnggotaHubungan').value = decodeURIComponent(hubEnc || '');
+    document.getElementById('formAnggotaTglLahir').value = decodeURIComponent(tglEnc || '');
+    document.getElementById('formAnggotaUmurVal').value = umur || '0';
+    document.getElementById('formAnggotaUmurDisplay').value = (umur || '0') + ' Tahun';
+    document.getElementById('formAnggotaGender').value = gender || 'Perempuan';
+    document.getElementById('modalAnggotaTitle').innerText = 'Edit Data Anggota Keluarga';
+    document.getElementById('modalAnggota').classList.remove('hidden');
+  }
+
+  function handleSaveAnggota() {
+    var payload = {
+      idAnggota: document.getElementById('formAnggotaId').value,
+      noKk: document.getElementById('formAnggotaKk').value || currentFamilyNoKk || (currentUser ? currentUser.noKk : ''),
+      namaAnggota: document.getElementById('formAnggotaNama').value,
+      hubunganKeluarga: document.getElementById('formAnggotaHubungan').value,
+      tanggalLahir: document.getElementById('formAnggotaTglLahir').value,
+      umur: document.getElementById('formAnggotaUmurVal').value,
+      jenisKelamin: document.getElementById('formAnggotaGender').value
+    };
+    var btn = document.getElementById('btnSaveAnggota');
+    btn.disabled = true;
+    btn.innerText = 'Menyimpan...';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(function(res) {
+        btn.disabled = false;
+        btn.innerText = 'Simpan Data';
+        closeModal('modalAnggota');
+        if (res && res.success) {
+          showToast(res.message, 'success');
+          fetchFamilyData(currentFamilyNoKk);
+          refreshData();
+        }
+      }).saveAnggotaKeluarga(payload);
+    } else {
+      setTimeout(function() {
+        btn.disabled = false;
+        btn.innerText = 'Simpan Data';
+        closeModal('modalAnggota');
+        showToast('Berhasil disimpan.', 'success');
+        fetchFamilyData(currentFamilyNoKk);
+      }, 400);
+    }
+  }
+
+  function handleDeleteAnggota(idAnggota) {
+    showToast('Menghapus...', 'info');
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(function(res) {
+        if (res && res.success) {
+          showToast(res.message, 'success');
+          fetchFamilyData(currentFamilyNoKk);
+          refreshData();
+        }
+      }).deleteAnggotaKeluarga(idAnggota);
+    } else {
+      setTimeout(function() {
+        showToast('Dihapus (Demo)', 'success');
+        fetchFamilyData(currentFamilyNoKk);
+      }, 300);
+    }
+  }
+
+  function fetchMadingData() {
+    var search = document.getElementById('filterMadingSearch') ? document.getElementById('filterMadingSearch').value : '';
+    var container = document.getElementById('madingListContainer');
+    container.innerHTML = '<div class="col-span-full p-6 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat mading...</div>';
+
+    var params = { search: search, role: currentUser ? currentUser.role : 'Warga' };
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(function(res) {
+        if (res && res.success) renderMadingCards(res.data);
+      }).getMadingList(params);
+    } else {
+      setTimeout(function() {
+        renderMadingCards([{ idMading: 'MAD-0001', judul: 'Kerja Bakti Bulanan RT 010', tanggalKegiatan: '10 September 2026', note: 'Diharapkan seluruh warga hadir membawa alat kebersihan.', statusPublish: 'Published', pembuat: 'Budi Santoso (Ketua RT)' }]);
+      }, 300);
+    }
+  }
+
+  function renderMadingCards(list) {
+    var container = document.getElementById('madingListContainer');
+    container.innerHTML = '';
+    if (!list || list.length === 0) {
+      container.innerHTML = '<div class="col-span-full p-8 text-center bg-white rounded-2xl border border-slate-200 text-slate-400 text-xs">Belum ada informasi mading.</div>';
+      return;
+    }
+
+    var isPengurus = currentUser && (currentUser.role === 'Super Admin' || currentUser.statusUser === 'Pengurus RT');
+
+    for (var i = 0; i < list.length; i++) {
+      var m = list[i];
+      var card = document.createElement('div');
+      card.className = 'dashboard-card p-5 flex flex-col justify-between relative overflow-hidden';
+
+      var badgeStatus = m.statusPublish === 'Published' 
+        ? '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">Published</span>' 
+        : '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">Draft</span>';
+
+      var actionEditDelete = '';
+      if (isPengurus) {
+        actionEditDelete = 
+          '<div class="flex items-center gap-1.5 mt-4 pt-3 border-t border-slate-100">' +
+            '<button onclick="editMading(\'' + m.idMading + '\', \'' + encodeURIComponent(m.judul) + '\', \'' + encodeURIComponent(m.tanggalKegiatan) + '\', \'' + encodeURIComponent(m.note) + '\', \'' + m.statusPublish + '\')" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 transition"><i class="fa-solid fa-pen-to-square mr-1"></i>Edit</button>' +
+            '<button onclick="deleteMading(\'' + m.idMading + '\')" class="px-3 py-1.5 rounded-lg bg-rose-50 text-rose-600 font-bold text-xs hover:bg-rose-100 transition"><i class="fa-solid fa-trash mr-1"></i>Hapus</button>' +
+          '</div>';
+      }
+
+      card.innerHTML = 
+        '<div>' +
+          '<div class="flex items-center justify-between mb-2">' +
+            '<span class="text-[11px] font-bold text-brand-indigo bg-brand-lavender px-3 py-1 rounded-full"><i class="fa-solid fa-calendar-days mr-1.5"></i>' + m.tanggalKegiatan + '</span>' +
+            (isPengurus ? badgeStatus : '') +
+          '</div>' +
+          '<h4 class="text-base font-bold text-slate-800 mt-2 mb-1">' + m.judul + '</h4>' +
+          '<p class="text-xs text-slate-600 leading-relaxed whitespace-pre-line mt-2">' + m.note + '</p>' +
+        '</div>' +
+        '<div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">' +
+          '<span><i class="fa-solid fa-user-pen mr-1"></i>Pembuat: <strong class="text-slate-700">' + m.pembuat + '</strong></span>' +
+          '<span>' + m.createdAt + '</span>' +
+        '</div>' +
+        actionEditDelete;
+
+      container.appendChild(card);
+    }
+  }
+
+  function openModalTambahMading() {
+    document.getElementById('formMadingId').value = '';
+    document.getElementById('formMadingJudul').value = '';
+    document.getElementById('formMadingTgl').value = '';
+    document.getElementById('formMadingNote').value = '';
+    document.getElementById('formMadingStatus').value = 'Published';
+    document.getElementById('modalMadingTitle').innerText = 'Buat Pengumuman Mading';
+    document.getElementById('modalMading').classList.remove('hidden');
+  }
+
+  function editMading(id, judulEnc, tglEnc, noteEnc, status) {
+    document.getElementById('formMadingId').value = id;
+    document.getElementById('formMadingJudul').value = decodeURIComponent(judulEnc);
+    document.getElementById('formMadingTgl').value = decodeURIComponent(tglEnc);
+    document.getElementById('formMadingNote').value = decodeURIComponent(noteEnc);
+    document.getElementById('formMadingStatus').value = status;
+    document.getElementById('modalMadingTitle').innerText = 'Edit Informasi Mading';
+    document.getElementById('modalMading').classList.remove('hidden');
+  }
+
+  function handleSaveMading() {
+    var pembuatNama = currentUser ? (currentUser.nama + ' (' + (currentUser.role || currentUser.statusUser || 'Pengurus') + ')') : 'Pengurus RT';
+    var payload = {
+      idMading: document.getElementById('formMadingId').value,
+      judul: document.getElementById('formMadingJudul').value,
+      tanggalKegiatan: document.getElementById('formMadingTgl').value,
+      note: document.getElementById('formMadingNote').value,
+      statusPublish: document.getElementById('formMadingStatus').value,
+      pembuat: pembuatNama
+    };
+
+    var btn = document.getElementById('btnSaveMading');
+    btn.disabled = true;
+    btn.innerText = 'Menyimpan...';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(function(res) {
+        btn.disabled = false;
+        btn.innerText = 'Simpan & Publikasikan';
+        closeModal('modalMading');
+        if (res && res.success) {
+          showToast(res.message, 'success');
+          fetchMadingData();
+          refreshData();
+        }
+      }).saveMading(payload);
+    } else {
+      setTimeout(function() {
+        btn.disabled = false;
+        btn.innerText = 'Simpan & Publikasikan';
+        closeModal('modalMading');
+        showToast('Berhasil disimpan.', 'success');
+        fetchMadingData();
+      }, 400);
+    }
+  }
+
+  function deleteMading(idMading) {
+    showToast('Menghapus...', 'info');
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(function(res) {
+        if (res && res.success) {
+          showToast(res.message, 'success');
+          fetchMadingData();
+          refreshData();
+        }
+      }).deleteMading(idMading);
+    } else {
+      setTimeout(function() {
+        showToast('Berhasil dihapus (Demo)', 'success');
+        fetchMadingData();
+      }, 300);
+    }
+  }
+</script>
