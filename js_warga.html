@@ -1,0 +1,186 @@
+<script>
+  function debounceFetchWarga() {
+    clearTimeout(debounceTimerWarga);
+    debounceTimerWarga = setTimeout(function() { fetchWargaData(0); }, 350);
+  }
+
+  function fetchWargaData(offset) {
+    offset = offset || 0;
+    var search = document.getElementById('filterWargaSearch').value;
+    var rumah = document.getElementById('filterWargaRumah').value;
+    var role = document.getElementById('filterWargaRole').value;
+
+    var params = { limit: 10, offset: offset, search: search, statusRumah: rumah, role: role };
+    var tbody = document.getElementById('wargaTableBody');
+    tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat...</td></tr>';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(function(res) {
+        if (res && res.success) renderWargaTable(res);
+      }).getWargaList(params);
+    } else {
+      setTimeout(function() {
+        renderWargaTable({
+          data: [{ noKk: '3171010000000001', noKtp: '3171010101850001', nama: 'Budi Santoso', noHp: '081234567890', alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim', statusRumah: 'Pribadi', pekerjaan: 'Pegawai Negeri', role: 'Super Admin', statusUser: 'Pengurus RT' }],
+          total: 1, page: 1, totalPages: 1
+        });
+      }, 300);
+    }
+  }
+
+  function renderWargaTable(res) {
+    var tbody = document.getElementById('wargaTableBody');
+    tbody.innerHTML = '';
+    if (!res.data || res.data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-400">Tidak ada data.</td></tr>';
+      document.getElementById('wargaPaginationInfo').innerText = 'Menampilkan 0 data';
+      document.getElementById('wargaPaginationBtns').innerHTML = '';
+      return;
+    }
+
+    for (var i = 0; i < res.data.length; i++) {
+      var w = res.data[i];
+      var tr = document.createElement('tr');
+      tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+
+      tr.innerHTML = 
+        '<td class="p-3.5"><p class="font-bold text-slate-800">' + w.nama + '</p><p class="text-[10px] text-slate-400 font-mono">KK: ' + w.noKk + '</p></td>' +
+        '<td class="p-3.5 text-slate-700 font-medium"><i class="fa-solid fa-phone mr-1.5 text-slate-400"></i>' + w.noHp + '</td>' +
+        '<td class="p-3.5 text-slate-600">' + (w.alamat || '-') + '</td>' +
+        '<td class="p-3.5"><span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">' + w.statusRumah + '</span></td>' +
+        '<td class="p-3.5 font-medium text-slate-700">' + w.pekerjaan + '</td>';
+      tbody.appendChild(tr);
+    }
+    document.getElementById('wargaPaginationInfo').innerText = 'Halaman ' + res.page + ' dari ' + res.totalPages;
+    renderPaginationButtons('wargaPaginationBtns', res.page, res.totalPages, 'fetchWargaData');
+  }
+
+  function exportWargaCSV() {
+    showToast('Menyiapkan export...', 'info');
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(function(res) {
+        if (res && res.success && res.data) {
+          triggerCSVDownload(res.data, 'Data_Warga_RT010.csv');
+          showToast('Export berhasil.', 'success');
+        }
+      }).getAllWargaForExport();
+    } else {
+      setTimeout(function() {
+        triggerCSVDownload([{ noKk: '3171010000000001', nama: 'Budi Santoso', noHp: '081234567890' }], 'Data_Warga_Demo.csv');
+      }, 400);
+    }
+  }
+
+  function triggerCSVDownload(dataArray, filename) {
+    if (!dataArray || dataArray.length === 0) return;
+    var headers = Object.keys(dataArray[0]);
+    var csvRows = [headers.join(',')];
+
+    for (var i = 0; i < dataArray.length; i++) {
+      var values = [];
+      for (var h = 0; h < headers.length; h++) {
+        var val = String(dataArray[i][headers[h]] || '').replace(/"/g, '""');
+        values.push('"' + val + '"');
+      }
+      csvRows.push(values.join(','));
+    }
+
+    var blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    var link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  function downloadWargaTemplateCSV() {
+    var template = [{ No_KK: '3171010000000099', No_KTP: '3171010101850099', Nama: 'Warga Contoh', No_HP: '081299998888', Password: 'warga123', Role: 'Warga', Status_User: 'Warga', Tanggal_Lahir: '10/10/1990', Umur: '34', Alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim', Jenis_Kelamin: 'Laki-laki', Status_Keluarga: 'Suami', Status_Rumah: 'Pribadi', Pendidikan: 'SMA', Pekerjaan: 'Pegawai Swasta' }];
+    triggerCSVDownload(template, 'Template_Import_Warga.csv');
+  }
+
+  function openModalImportWarga() {
+    document.getElementById('importFileCsv').value = '';
+    var notice = document.getElementById('importResultNotice');
+    notice.className = 'hidden';
+    notice.innerHTML = '';
+    document.getElementById('modalImportWarga').classList.remove('hidden');
+  }
+
+  function processImportWarga() {
+    var fileInput = document.getElementById('importFileCsv');
+    if (!fileInput.files || fileInput.files.length === 0) {
+      showToast('Pilih file CSV terlebih dahulu!', 'error');
+      return;
+    }
+
+    var file = fileInput.files[0];
+    var reader = new FileReader();
+    var btn = document.getElementById('btnProsesImport');
+    btn.disabled = true;
+    btn.innerText = 'Memproses...';
+
+    reader.onload = function(e) {
+      var text = e.target.result;
+      var parsedData = parseCSVToWargaList(text);
+
+      if (parsedData.length === 0) {
+        btn.disabled = false;
+        btn.innerText = 'Mulai Import';
+        showToast('File CSV kosong.', 'error');
+        return;
+      }
+
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        google.script.run.withSuccessHandler(function(res) {
+          btn.disabled = false;
+          btn.innerText = 'Mulai Import';
+          if (res && res.success) {
+            renderImportResult(res);
+            fetchWargaData(0);
+            refreshData();
+          }
+        }).importWargaBatch(parsedData);
+      } else {
+        setTimeout(function() {
+          btn.disabled = false;
+          btn.innerText = 'Mulai Import';
+          renderImportResult({ success: true, importedCount: parsedData.length, duplicates: [], message: 'Import selesai.' });
+        }, 500);
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function parseCSVToWargaList(csvText) {
+    var lines = csvText.split(/\r\n|\n/);
+    if (lines.length <= 1) return [];
+    var headers = lines[0].split(',').map(function(h) { return h.replace(/"/g, '').trim(); });
+    var list = [];
+    for (var i = 1; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (!line) continue;
+      var cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(function(c) { return c.replace(/"/g, '').trim(); });
+      var rowObj = {};
+      for (var h = 0; h < headers.length; h++) rowObj[headers[h]] = cols[h] || '';
+      if (rowObj['No_KK'] || rowObj['noKk']) list.push(rowObj);
+    }
+    return list;
+  }
+
+  function renderImportResult(res) {
+    var notice = document.getElementById('importResultNotice');
+    notice.classList.remove('hidden');
+    var html = '<p class="font-bold text-slate-800 mb-1">' + res.message + '</p>';
+    if (res.duplicates && res.duplicates.length > 0) {
+      notice.className = 'p-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs leading-relaxed max-h-40 overflow-y-auto';
+      html += '<p class="font-bold text-red-600 mt-2 mb-1">Duplikat Dilewati (' + res.duplicates.length + '):</p><ul class="list-disc pl-4 space-y-0.5 text-[11px] text-red-700">';
+      for (var i = 0; i < res.duplicates.length; i++) html += '<li>' + res.duplicates[i] + '</li>';
+      html += '</ul>';
+    } else {
+      notice.className = 'p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs leading-relaxed';
+      html += '<p class="text-emerald-700 mt-1"><i class="fa-solid fa-circle-check mr-1"></i>Seluruh data CSV diimpor.</p>';
+    }
+    notice.innerHTML = html;
+  }
+</script>
