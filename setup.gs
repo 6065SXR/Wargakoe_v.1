@@ -113,6 +113,34 @@ var DB_SCHEMA = {
       'Disetujui_Oleh',
       'Created_At'
     ]
+  },
+  JADWAL_RONDA: {
+    name: 'JADWAL_RONDA',
+    headers: [
+      'ID_Jadwal',
+      'Nama_Regu',
+      'Tanggal_Ronda',
+      'Ketua_Regu',
+      'Lokasi_Pos',
+      'Jam_Shift',
+      'Daftar_Warga_JSON',
+      'Catatan',
+      'Created_At'
+    ]
+  },
+  ABSENSI_RONDA: {
+    name: 'ABSENSI_RONDA',
+    headers: [
+      'ID_Absen',
+      'ID_Jadwal',
+      'Tanggal_Ronda',
+      'No_KK',
+      'Nama_Warga',
+      'Waktu_Absen',
+      'Status_Hadir',
+      'Foto_Selfie',
+      'Created_At'
+    ]
   }
 };
 
@@ -137,7 +165,6 @@ function setupDatabase() {
       }
     }
 
-    // Perbaikan otomatis & pembersihan legacy data KWI-IUR-
     repairIuranSheet_(ss);
     seedInitialData_(ss);
     SpreadsheetApp.flush();
@@ -246,7 +273,6 @@ function repairIuranSheet_(ss) {
         createdAt = row[10] || row[currentHeaders.indexOf('Created_At')] || '';
       }
 
-      // Normalisasi status
       status = status.trim();
       if (status === 'Menunggu Approval' || status === 'Menunggu' || status === 'Pending') {
         status = 'Menunggu';
@@ -329,7 +355,6 @@ function seedInitialData_(ss) {
     kasSheet.getRange(2, 1, dummyKas.length, dummyKas[0].length).setValues(dummyKas);
   }
 
-  // Inisialisasi awal Master Aset
   var asetSheet = ss.getSheetByName(DB_SCHEMA.ASET.name);
   if (asetSheet && asetSheet.getLastRow() <= 1) {
     var dummyAset = [
@@ -341,12 +366,25 @@ function seedInitialData_(ss) {
     asetSheet.getRange(2, 1, dummyAset.length, dummyAset[0].length).setValues(dummyAset);
   }
 
-  // Inisialisasi awal Riwayat Peminjaman Aset
   var pinjamSheet = ss.getSheetByName(DB_SCHEMA.PEMINJAMAN_ASET.name);
   if (pinjamSheet && pinjamSheet.getLastRow() <= 1) {
     var dummyPinjam = [
       ['PJM-0001', 'AST-0002', 'Kursi Plastik Hijau', '3171010000000003', 'Agus Setiawan', '081234567892', '20', '10/09/2026', '12/09/2026', 'Acara syukuran aqiqah di rumah', 'Menunggu', '-', '-', nowStr]
     ];
     pinjamSheet.getRange(2, 1, dummyPinjam.length, dummyPinjam[0].length).setValues(dummyPinjam);
+  }
+
+  // Seed Awal Jadwal Ronda
+  var rondaSheet = ss.getSheetByName(DB_SCHEMA.JADWAL_RONDA.name);
+  if (rondaSheet && rondaSheet.getLastRow() <= 1) {
+    var dummyWargaList = JSON.stringify([
+      { noKk: '3171010000000001', nama: 'Budi Santoso', noHp: '081234567890', peran: 'Ketua Regu' },
+      { noKk: '3171010000000003', nama: 'Agus Setiawan', noHp: '081234567892', peran: 'Anggota' },
+      { noKk: '3171010000000004', nama: 'Haji Abdullah', noHp: '081234567893', peran: 'Anggota' }
+    ]);
+    var dummyRonda = [
+      ['RND-0001', 'Regu Alpha (Pos Utama)', '2026-09-05', 'Budi Santoso', 'Pos Ronda Utama RT 010', '22.00 - 03.00 WIB', dummyWargaList, 'Wajib membawa senter & kentongan', nowStr]
+    ];
+    rondaSheet.getRange(2, 1, dummyRonda.length, dummyRonda[0].length).setValues(dummyRonda);
   }
 }
