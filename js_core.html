@@ -5,18 +5,15 @@
   var debounceTimerIuran = null;
   var currentFamilyNoKk = '';
 
-  window.onload = function() {
-    setTimeout(function() {
-      var splash = document.getElementById('splashScreen');
-      if (splash) {
-        splash.classList.add('opacity-0');
-        setTimeout(function() {
-          splash.classList.add('hidden');
-          checkInitialAuth();
-        }, 500);
-      }
-    }, 1500);
+  // Konfigurasi Sesi & Batas Waktu Tidak Aktif (5 Menit)
+  var SESSION_STORAGE_KEY = 'wargakoe_user_session';
+  var LAST_ACTIVITY_KEY = 'wargakoe_last_activity';
+  var SESSION_TIMEOUT_MS = 5 * 60 * 1000; // 5 Menit dalam milidetik
+  var inactivityIntervalId = null;
+  var lastThrottleTime = 0;
 
+  window.onload = function() {
+    // 1. Inisialisasi filter bulan dan tahun berjalan
     var dateNow = new Date();
     var months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
     var currentMonthStr = months[dateNow.getMonth()];
@@ -30,24 +27,171 @@
     if (kMonth) kMonth.value = currentMonthStr;
     var kYear = document.getElementById('kasRtFilterTahun');
     if (kYear) kYear.value = currentYearStr;
+
+    // 2. Periksa status sesi pengguna secara instan
+    checkInitialAuth();
   };
 
   function checkInitialAuth() {
-    if (typeof google === 'undefined' || !google.script || !google.script.run) {
-      showToast('Mode Canvas Demo', 'info');
-      currentUser = {
-        noKk: '3171010000000001',
-        noKtp: '3171010101850001',
-        nama: 'Budi Santoso',
-        noHp: '081234567890',
-        role: 'Super Admin',
-        statusUser: 'Pengurus RT',
-        alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim Perdana Kusuma'
-      };
+    var splash = document.getElementById('splashScreen');
+    var savedSession = getValidStoredSession();
+
+    // JIKA USER SUDAH LOGIN & SESI MASIH VALID (< 5 MENIT)
+    if (savedSession) {
+      // Langsung sembunyikan splash screen seketika tanpa animasi tunggu
+      if (splash) {
+        splash.style.display = 'none';
+        splash.classList.add('hidden');
+      }
+
+      currentUser = savedSession;
+      touchLastActivity();
+      setupActivityTracker();
       showMainDashboard();
+      showToast('Selamat datang kembali, ' + (currentUser.nama || 'Warga') + '!', 'success');
       return;
     }
+
+    // JIKA SESI KEDALUWARSA ATAU PENGGUNA BELUM LOGIN
+    var wasExpired = isSessionExpired();
+    if (wasExpired) {
+      clearStoredSession();
+    }
+
+    // Tampilkan animasi splash screen secara normal (1.5 detik) khusus saat belum login
+    setTimeout(function() {
+      if (splash) {
+        splash.classList.add('opacity-0');
+        setTimeout(function() {
+          splash.classList.add('hidden');
+          if (wasExpired) {
+            showToast('Sesi Anda telah berakhir karena tidak ada aktivitas selama 5 menit. Silakan login kembali.', 'info');
+          }
+          showAuthCard('login');
+        }, 500);
+      } else {
+        if (wasExpired) {
+          showToast('Sesi Anda telah berakhir karena tidak ada aktivitas selama 5 menit. Silakan login kembali.', 'info');
+        }
+        showAuthCard('login');
+      }
+    }, 1500);
+  }
+
+  function saveStoredSession(user) {
+    try {
+      if (user) {
+        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(user));
+        localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
+      }
+    } catch (e) {
+      console.warn('LocalStorage tidak dapat diakses:', e);
+    }
+  }
+
+  function clearStoredSession() {
+    try {
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+      localStorage.removeItem(LAST_ACTIVITY_KEY);
+    } catch (e) {}
+  }
+
+  function touchLastActivity() {
+    try {
+      localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
+    } catch (e) {}
+  }
+
+  function getValidStoredSession() {
+    try {
+      var rawUser = localStorage.getItem(SESSION_STORAGE_KEY);
+      var rawActivity = localStorage.getItem(LAST_ACTIVITY_KEY);
+
+      if (!rawUser || !rawActivity) return null;
+
+      var lastTime = parseInt(rawActivity, 10);
+      if (isNaN(lastTime)) return null;
+
+      var diff = Date.now() - lastTime;
+      if (diff < SESSION_TIMEOUT_MS) {
+        return JSON.parse(rawUser);
+      }
+    } catch (e) {
+      console.warn('Gagal membaca sesi tersimpan:', e);
+    }
+    return null;
+  }
+
+  function isSessionExpired() {
+    try {
+      var rawUser = localStorage.getItem(SESSION_STORAGE_KEY);
+      var rawActivity = localStorage.getItem(LAST_ACTIVITY_KEY);
+      if (rawUser && rawActivity) {
+        var lastTime = parseInt(rawActivity, 10);
+        return !isNaN(lastTime) && (Date.now() - lastTime >= SESSION_TIMEOUT_MS);
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  function recordUserActivity() {
+    var now = Date.now();
+    // Throttling: perbarui timestamp aktivitas maksimal sekali setiap 5 detik agar performa tetap optimal
+    if (now - lastThrottleTime > 5000) {
+      lastThrottleTime = now;
+      if (currentUser) {
+        touchLastActivity();
+      }
+    }
+  }
+
+  function setupActivityTracker() {
+    stopActivityTracker();
+
+    var events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+    for (var i = 0; i < events.length; i++) {
+      window.addEventListener(events[i], recordUserActivity, { passive: true });
+    }
+
+    // Pengecekan latar belakang setiap 10 detik apakah pengguna sudah diam lebih dari 5 menit
+    inactivityIntervalId = setInterval(function() {
+      if (!currentUser) return;
+
+      try {
+        var rawActivity = localStorage.getItem(LAST_ACTIVITY_KEY);
+        if (rawActivity) {
+          var lastTime = parseInt(rawActivity, 10);
+          if (!isNaN(lastTime) && (Date.now() - lastTime >= SESSION_TIMEOUT_MS)) {
+            triggerAutoLogout();
+          }
+        }
+      } catch (e) {}
+    }, 10000);
+  }
+
+  function stopActivityTracker() {
+    if (inactivityIntervalId) {
+      clearInterval(inactivityIntervalId);
+      inactivityIntervalId = null;
+    }
+    var events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+    for (var i = 0; i < events.length; i++) {
+      window.removeEventListener(events[i], recordUserActivity);
+    }
+  }
+
+  function triggerAutoLogout() {
+    stopActivityTracker();
+    clearStoredSession();
+    currentUser = null;
+
+    var inputHp = document.getElementById('loginNoHp');
+    var inputPass = document.getElementById('loginPassword');
+    if (inputHp) inputHp.value = '';
+    if (inputPass) inputPass.value = '';
+
     showAuthCard('login');
+    showToast('Sesi Anda berakhir otomatis karena tidak aktif selama 5 menit. Silakan login kembali.', 'info');
   }
 
   function showAuthCard(cardType) {
@@ -98,6 +242,8 @@
           btn.innerHTML = '<span>Masuk Sekarang</span><i class="fa-solid fa-arrow-right"></i>';
           if (res && res.success) {
             currentUser = res.user;
+            saveStoredSession(currentUser);
+            setupActivityTracker();
             showToast(res.message, 'success');
             showMainDashboard();
           } else {
@@ -121,6 +267,8 @@
           statusUser: 'Pengurus RT',
           alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim'
         };
+        saveStoredSession(currentUser);
+        setupActivityTracker();
         showToast('Login Demo Berhasil', 'success');
         showMainDashboard();
       }, 600);
@@ -300,9 +448,15 @@
   }
 
   function handleLogout() {
+    stopActivityTracker();
+    clearStoredSession();
     currentUser = null;
-    document.getElementById('loginNoHp').value = '';
-    document.getElementById('loginPassword').value = '';
+
+    var inputHp = document.getElementById('loginNoHp');
+    var inputPass = document.getElementById('loginPassword');
+    if (inputHp) inputHp.value = '';
+    if (inputPass) inputPass.value = '';
+
     showToast('Anda telah keluar dari aplikasi.', 'info');
     showAuthCard('login');
   }
@@ -311,6 +465,8 @@
     var toast = document.getElementById('toastNotification');
     var msg = document.getElementById('toastMessage');
     var icon = document.getElementById('toastIcon');
+    if (!toast || !msg || !icon) return;
+
     msg.innerText = message;
 
     if (type === 'success') icon.className = 'fa-solid fa-circle-check text-brand-neon text-base';
