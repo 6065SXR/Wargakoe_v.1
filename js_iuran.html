@@ -1,263 +1,610 @@
 <script>
-  function openModalBayarIuran() {
-    document.getElementById('bayarNamaWarga').value = currentUser ? currentUser.nama : 'Warga RT 010';
-    var dateNow = new Date();
-    var months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-    document.getElementById('bayarBulanTahun').value = months[dateNow.getMonth()] + ' ' + dateNow.getFullYear();
-    
-    var dayStr = ('0' + dateNow.getDate()).slice(-2);
-    var monthStr = ('0' + (dateNow.getMonth() + 1)).slice(-2);
-    document.getElementById('bayarTanggal').value = dateNow.getFullYear() + '-' + monthStr + '-' + dayStr;
-
-    document.getElementById('bayarJenisIuran').value = 'Iuran Kas';
-    document.getElementById('bayarNominal').value = '50000';
-
-    if (typeof google !== 'undefined' && google.script && google.script.run) {
-      google.script.run.withSuccessHandler(function(res) {
-        if (res && res.success) {
-          document.getElementById('bayarNoKuitansi').value = res.noKuitansi;
-          document.getElementById('modalBayarIuran').classList.remove('hidden');
-        }
-      }).getNextKuitansiNo();
-    } else {
-      var yyyymmdd = dateNow.getFullYear() + monthStr + dayStr;
-      document.getElementById('bayarNoKuitansi').value = yyyymmdd + '01';
-      document.getElementById('modalBayarIuran').classList.remove('hidden');
-    }
-  }
-
-  function updateDefaultNominalIuran(jenis) {
-    var nomInput = document.getElementById('bayarNominal');
-    if (jenis === 'Iuran Kas') nomInput.value = '50000';
-    else if (jenis === 'Iuran Duka') nomInput.value = '20000';
-    else if (jenis === 'Iuran Sampah') nomInput.value = '25000';
-    else if (jenis === 'Iuran Sosial') nomInput.value = '15000';
-    else nomInput.value = '50000';
-  }
-
-  function handleSaveBayarIuran() {
-    var payload = {
-      noKuitansi: document.getElementById('bayarNoKuitansi').value,
-      noKk: currentUser ? currentUser.noKk : '',
-      namaWarga: document.getElementById('bayarNamaWarga').value,
-      jenisIuran: document.getElementById('bayarJenisIuran').value,
-      bulanTahun: document.getElementById('bayarBulanTahun').value,
-      tanggalBayar: document.getElementById('bayarTanggal').value,
-      nominal: document.getElementById('bayarNominal').value
-    };
-
-    var btn = document.getElementById('btnSubmitBayarIuran');
-    btn.disabled = true;
-    btn.innerText = 'Mengirim...';
-
-    if (typeof google !== 'undefined' && google.script && google.script.run) {
-      google.script.run.withSuccessHandler(function(res) {
-        btn.disabled = false;
-        btn.innerText = 'Kirim Pembayaran';
-        closeModal('modalBayarIuran');
-        if (res && res.success) {
-          showToast(res.message, 'success');
-          fetchIuranData(0);
-          refreshData();
-        } else {
-          showToast(res ? res.message : 'Gagal.', 'error');
-        }
-      }).submitBayarIuran(payload);
-    } else {
-      setTimeout(function() {
-        btn.disabled = false;
-        btn.innerText = 'Kirim Pembayaran';
-        closeModal('modalBayarIuran');
-        showToast('Pembayaran berhasil dikirim! Status: Menunggu', 'success');
-        fetchIuranData(0);
-        refreshData();
-      }, 400);
-    }
-  }
+  var currentIuranOffset = 0;
+  var debounceTimerIuran = null;
 
   function debounceFetchIuran() {
-    clearTimeout(debounceTimerIuran);
-    debounceTimerIuran = setTimeout(function() { fetchIuranData(0); }, 350);
+    if (debounceTimerIuran) clearTimeout(debounceTimerIuran);
+    debounceTimerIuran = setTimeout(function() {
+      fetchIuranData(0);
+    }, 300);
   }
 
   function fetchIuranData(offset) {
     offset = offset || 0;
-    var status = document.getElementById('filterIuranStatus').value;
-    var jenis = document.getElementById('filterIuranJenis').value;
-    var search = document.getElementById('filterIuranSearch').value;
+    currentIuranOffset = offset;
+
+    var filterStatus = document.getElementById('filterIuranStatus') ? document.getElementById('filterIuranStatus').value : 'SEMUA';
+    var filterJenis = document.getElementById('filterIuranJenis') ? document.getElementById('filterIuranJenis').value : 'SEMUA';
+    var search = document.getElementById('filterIuranSearch') ? document.getElementById('filterIuranSearch').value : '';
+
+    var tbody = document.getElementById('iuranTableBody');
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat data iuran...</td></tr>';
+    }
+
     var params = {
       limit: 10,
       offset: offset,
-      statusBayar: status,
-      jenisIuran: jenis,
-      search: search,
-      role: currentUser ? currentUser.role : 'Warga',
-      noKk: currentUser ? currentUser.noKk : ''
+      status: filterStatus,
+      jenis: filterJenis,
+      search: search
     };
 
-    var tbody = document.getElementById('iuranTableBody');
-    tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat data iuran...</td></tr>';
-
     if (typeof google !== 'undefined' && google.script && google.script.run) {
-      google.script.run.withSuccessHandler(function(res) {
-        if (res && res.success) renderIuranTable(res);
-      }).getIuranList(params);
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success) {
+            renderIuranTable(res.data);
+            renderPaginationButtons('iuranPaginationBtns', res.page, res.totalPages, 'fetchIuranData');
+            var info = document.getElementById('iuranPaginationInfo');
+            if (info) info.innerText = 'Menampilkan ' + (res.data.length || 0) + ' dari ' + (res.total || 0) + ' data iuran';
+          }
+        })
+        .withFailureHandler(function(err) {
+          if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-rose-500">Gagal memuat data: ' + err.toString() + '</td></tr>';
+        })
+        .getIuranList(params);
     } else {
       setTimeout(function() {
         var dummyData = [
-          { idIuran: 'IUR-0001', noKuitansi: '2026090101', namaWarga: 'Budi Santoso', noKk: '3171010000000001', bulanTahun: 'September 2026', jenisIuran: 'Iuran Kas', nominal: '50000', statusBayar: 'Sudah bayar', approvedBy: 'Siti Rahmawati' },
-          { idIuran: 'IUR-0003', noKuitansi: '2026090103', namaWarga: 'Agus Setiawan', noKk: '3171010000000003', bulanTahun: 'September 2026', jenisIuran: 'Iuran Sampah', nominal: '25000', statusBayar: 'Menunggu', approvedBy: '-' }
+          { idIuran: 'IUR-0008', noKuitansi: '20260905308', noKk: '3171010000000007', namaWarga: 'Yogi', bulanTahun: 'September 2026', jenisIuran: 'Iuran Kas', nominal: 50000, statusBayar: 'Menunggu', tanggalBayar: '05/09/2026', approvedBy: '-' },
+          { idIuran: 'IUR-0007', noKuitansi: '2026090503', noKk: '3171010000000007', namaWarga: 'Yogi', bulanTahun: 'September 2026', jenisIuran: 'Iuran Kas', nominal: 50000, statusBayar: 'Sudah bayar', tanggalBayar: '05/09/2026', approvedBy: 'Komeng' },
+          { idIuran: 'IUR-0006', noKuitansi: '2026090502', noKk: '3171010000000007', namaWarga: 'Yogi', bulanTahun: 'September 2026', jenisIuran: 'Iuran Sampah', nominal: 25000, statusBayar: 'Sudah bayar', tanggalBayar: '05/09/2026', approvedBy: 'Komeng' },
+          { idIuran: 'IUR-0005', noKuitansi: '2026090501', noKk: '3171010000000008', namaWarga: 'Tommy', bulanTahun: 'September 2026', jenisIuran: 'Iuran Kas', nominal: 50000, statusBayar: 'Sudah bayar', tanggalBayar: '05/09/2026', approvedBy: 'Komeng' }
         ];
-        if (currentUser && currentUser.role === 'Warga') {
-          dummyData = dummyData.filter(function(x) { return x.noKk === currentUser.noKk; });
-        }
-        renderIuranTable({ data: dummyData, total: dummyData.length, page: 1, totalPages: 1 });
+        renderIuranTable(dummyData);
+        var info = document.getElementById('iuranPaginationInfo');
+        if (info) info.innerText = 'Menampilkan 4 dari 4 data iuran (Mode Demo)';
       }, 300);
     }
   }
 
-  function renderIuranTable(res) {
+  function renderIuranTable(list) {
     var tbody = document.getElementById('iuranTableBody');
+    if (!tbody) return;
+
     tbody.innerHTML = '';
-    if (!res.data || res.data.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400">Tidak ada data iuran.</td></tr>';
-      document.getElementById('iuranPaginationInfo').innerText = 'Menampilkan 0 data';
-      document.getElementById('iuranPaginationBtns').innerHTML = '';
+    if (!list || list.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-400">Tidak ada data transaksi iuran ditemukan.</td></tr>';
       return;
     }
 
     var isPengurus = currentUser && (
       currentUser.role === 'Super Admin' ||
+      currentUser.statusUser === 'Pengurus RT' ||
       currentUser.role === 'Pengurus RT' ||
       currentUser.role === 'Ketua RT' ||
       currentUser.role === 'Bendahara' ||
-      currentUser.role === 'Sekretaris' ||
-      currentUser.statusUser === 'Pengurus RT'
+      currentUser.role === 'Sekretaris'
     );
 
-    for (var i = 0; i < res.data.length; i++) {
-      var row = res.data[i];
+    for (var i = 0; i < list.length; i++) {
+      var item = list[i];
       var tr = document.createElement('tr');
-      tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+      tr.className = 'hover:bg-slate-50/80 transition text-slate-700';
 
-      var st = (row.statusBayar || '').trim();
-      var isMenunggu = (st === 'Menunggu' || st === 'Menunggu Approval');
-
-      var statusBadge = '';
-      if (st === 'Sudah bayar' || st === 'Lunas') {
-        statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800"><i class="fa-solid fa-circle-check mr-1"></i>Sudah bayar</span>';
-      } else if (isMenunggu) {
-        statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 animate-pulse"><i class="fa-solid fa-clock mr-1"></i>Menunggu</span>';
-      } else if (st === 'Ditolak') {
-        statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800"><i class="fa-solid fa-circle-xmark mr-1"></i>Ditolak</span>';
+      var badgeStatus = '';
+      var sLower = String(item.statusBayar || '').toLowerCase().trim();
+      if (sLower === 'sudah bayar' || sLower === 'lunas' || sLower === 'approved') {
+        badgeStatus = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200"><i class="fa-solid fa-circle-check text-[9px]"></i>Lunas</span>';
+      } else if (sLower === 'menunggu' || sLower === 'pending') {
+        badgeStatus = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200"><i class="fa-solid fa-clock text-[9px]"></i>Menunggu</span>';
       } else {
-        statusBadge = '<span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700"><i class="fa-solid fa-circle-minus mr-1"></i>Belum Bayar</span>';
+        badgeStatus = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200"><i class="fa-solid fa-circle-xmark text-[9px]"></i>Belum Lunas</span>';
       }
 
       var actionBtns = '-';
-      if (isPengurus && isMenunggu) {
-        actionBtns = '<div class="flex items-center justify-center gap-1.5">' +
-          '<button onclick="handleApproveIuran(\'' + row.idIuran + '\', \'APPROVE\')" class="p-1 px-2.5 rounded-lg bg-emerald-600 text-white font-bold text-[10px] shadow hover:bg-emerald-700 transition flex items-center gap-1"><i class="fa-solid fa-check"></i> Diterima</button>' +
-          '<button onclick="handleApproveIuran(\'' + row.idIuran + '\', \'REJECT\')" class="p-1 px-2 rounded-lg bg-rose-100 text-rose-600 font-bold text-[10px] hover:bg-rose-200 transition flex items-center gap-1"><i class="fa-solid fa-xmark"></i> Ditolak</button>' +
-          '</div>';
+      if (isPengurus) {
+        if (sLower === 'menunggu') {
+          actionBtns = 
+            '<div class="flex items-center justify-center gap-1.5">' +
+              '<button type="button" onclick="handleVerifikasiIuran(\'' + item.idIuran + '\', \'Sudah bayar\')" class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] shadow-sm transition active:scale-95" title="Setujui Pembayaran"><i class="fa-solid fa-check mr-1"></i>Approve</button>' +
+              '<button type="button" onclick="handleVerifikasiIuran(\'' + item.idIuran + '\', \'Ditolak\')" class="px-2.5 py-1 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold text-[10px] transition active:scale-95" title="Tolak"><i class="fa-solid fa-xmark"></i></button>' +
+            '</div>';
+        } else {
+          actionBtns = '<span class="text-slate-400 text-[11px]"><i class="fa-solid fa-shield-check text-emerald-600 mr-1"></i>Terverifikasi</span>';
+        }
       }
 
       tr.innerHTML = 
-        '<td class="p-3.5"><p class="font-mono font-bold text-brand-indigo text-[11px]"><i class="fa-solid fa-ticket mr-1"></i>' + (row.noKuitansi || '-') + '</p><p class="font-semibold text-slate-800">' + row.namaWarga + '</p></td>' +
-        '<td class="p-3.5"><p class="font-bold text-slate-700">' + row.jenisIuran + '</p><p class="text-[10px] text-slate-400">' + row.bulanTahun + '</p></td>' +
-        '<td class="p-3.5 font-black text-slate-800">' + formatRupiah(row.nominal) + '</td>' +
-        '<td class="p-3.5">' + statusBadge + '</td>' +
-        '<td class="p-3.5 text-slate-500 text-[11px]">' + (row.approvedBy || '-') + '</td>' +
-        '<td class="p-3.5 text-center">' + actionBtns + '</td>';
+        '<td class="p-4">' +
+          '<div class="font-mono font-bold text-sky-700 text-xs">' + (item.noKuitansi || '-') + '</div>' +
+          '<div class="text-slate-900 font-bold mt-0.5">' + (item.namaWarga || '-') + '</div>' +
+        '</td>' +
+        '<td class="p-4">' +
+          '<div class="font-bold text-slate-800">' + (item.bulanTahun || '-') + '</div>' +
+          '<div class="text-[11px] text-slate-500 mt-0.5">' + (item.jenisIuran || '-') + '</div>' +
+        '</td>' +
+        '<td class="p-4 font-black text-slate-900">' + formatRupiahLocal_(item.nominal || 0) + '</td>' +
+        '<td class="p-4">' + badgeStatus + '</td>' +
+        '<td class="p-4 text-slate-600 font-medium text-[11px]">' + (item.approvedBy || '-') + '</td>' +
+        '<td class="p-4 text-center">' + actionBtns + '</td>';
+
       tbody.appendChild(tr);
     }
-    document.getElementById('iuranPaginationInfo').innerText = 'Halaman ' + res.page + ' dari ' + res.totalPages;
-    renderPaginationButtons('iuranPaginationBtns', res.page, res.totalPages, 'fetchIuranData');
   }
 
-  function handleApproveIuran(idIuran, action) {
-    var approver = currentUser ? currentUser.nama : 'Pengurus RT';
-    var actionLabel = action === 'APPROVE' ? 'DITERIMA' : 'DITOLAK';
-    showToast('Memproses verifikasi (' + actionLabel + ')...', 'info');
+  function fetchKasRtDetails() {
+    var curBadge = document.getElementById('kepatuhanPeriodeBadge');
+    var badgeText = curBadge ? curBadge.innerText.trim() : '';
+    var parts = badgeText.split(' ');
+    var bulan = parts[0] || 'September';
+    var tahun = parts[1] || '2026';
 
-    if (typeof google !== 'undefined' && google.script && google.script.run) {
-      google.script.run.withSuccessHandler(function(res) {
-        if (res && res.success) {
-          showToast(res.message, 'success');
-          fetchIuranData(0);
-          refreshData();
-        } else {
-          showToast(res ? res.message : 'Gagal.', 'error');
-        }
-      }).approveIuran(idIuran, approver, action);
+    if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.getKasRtDetails) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success && res.data) {
+            renderKeuanganRt3In1(res.data);
+          } else {
+            console.warn('Gagal muat kas detail:', res ? res.message : 'Respon kosong');
+          }
+        })
+        .withFailureHandler(function(err) {
+          console.error('Kesalahan server getKasRtDetails:', err);
+        })
+        .getKasRtDetails(bulan, tahun);
     } else {
       setTimeout(function() {
-        showToast('Pembayaran iuran berhasil diverifikasi: ' + actionLabel, 'success');
-        fetchIuranData(0);
-        refreshData();
-      }, 400);
-    }
-  }
-
-  function openModalExportPdfLaporan() {
-    document.getElementById('pdfFilterJenis').value = 'SEMUA';
-    generatePdfPrintPreview();
-    document.getElementById('modalExportPdfLaporan').classList.remove('hidden');
-  }
-
-  function generatePdfPrintPreview() {
-    var jenis = document.getElementById('pdfFilterJenis').value;
-    var tbody = document.getElementById('pdfReportTbody');
-    tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Menyiapkan Laporan Keuangan...</td></tr>';
-
-    var dateNow = new Date();
-    var dayStr = ('0' + dateNow.getDate()).slice(-2);
-    var monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-    document.getElementById('pdfPrintDate').innerText = dayStr + ' ' + monthNames[dateNow.getMonth()] + ' ' + dateNow.getFullYear();
-
-    if (typeof google !== 'undefined' && google.script && google.script.run) {
-      google.script.run.withSuccessHandler(function(res) {
-        if (res && res.success) renderPdfReportContent(res);
-      }).getLaporanKeuanganData(jenis);
-    } else {
-      setTimeout(function() {
-        renderPdfReportContent({
-          data: [
-            { noKuitansi: '2026090101', namaWarga: 'Budi Santoso', jenisIuran: 'Iuran Kas', bulanTahun: 'September 2026', nominal: 50000, tanggalBayar: '01/09/2026' },
-            { noKuitansi: '2026090102', namaWarga: 'Budi Santoso', jenisIuran: 'Iuran Duka', bulanTahun: 'September 2026', nominal: 20000, tanggalBayar: '01/09/2026' }
-          ],
-          totalNominal: 70000
+        renderKeuanganRt3In1({
+          dompet: {
+            kasRt: { masuk: 400000, keluar: 50000, saldo: 350000 },
+            kasDuka: { masuk: 5000, keluar: 0, saldo: 5000 },
+            kasSampah: { masuk: 75000, keluar: 50000, saldo: 25000 },
+            kasSosial: { masuk: 180000, keluar: 0, saldo: 180000 }
+          },
+          kepatuhan: {
+            periode: 'September 2026',
+            totalKk: 8,
+            lunasKk: 6,
+            belumLunasCount: 2,
+            persentase: 75,
+            belumLunasList: [
+              { nama: 'Haji Abdullah', noKk: '3171010000000004', noHp: '081234567893', alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010' },
+              { nama: 'Agus Setiawan', noKk: '3171010000000003', noHp: '081234567892', alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010' }
+            ]
+          },
+          pengeluaranList: [
+            { idKas: 'KAS-0022', tanggal: '02/09/2026', kategori: 'Iuran Sampah', keterangan: 'Gaji Komeng', nominal: 50000 },
+            { idKas: 'KAS-0021', tanggal: '02/09/2026', kategori: 'Iuran Kas', keterangan: 'Acara Rutin', nominal: 50000 },
+            { idKas: 'KAS-0019', tanggal: '02/09/2026', kategori: 'Kebersihan', keterangan: 'Kerja Bakti', nominal: 260000 },
+            { idKas: 'KAS-0004', tanggal: '12/08/2026', kategori: 'Fasilitas', keterangan: 'Perbaikan Lampu Jalan Gang Utama RT 05', nominal: 200000 },
+            { idKas: 'KAS-0003', tanggal: '05/08/2026', kategori: 'Kebersihan', keterangan: 'Pembelian Alat Kebersihan & Sapu Pos', nominal: 150000 }
+          ]
         });
       }, 300);
     }
   }
 
-  function renderPdfReportContent(res) {
-    var tbody = document.getElementById('pdfReportTbody');
-    tbody.innerHTML = '';
-    document.getElementById('pdfReportTotal').innerText = formatRupiah(res.totalNominal || 0);
+  function renderKeuanganRt3In1(data) {
+    if (!data) return;
 
-    if (!res.data || res.data.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400 border border-slate-300">Belum ada transaksi iuran yang terverifikasi untuk kategori ini.</td></tr>';
-      return;
+    /* 1. Render Dompet 4 Pos Terpisah */
+    if (data.dompet) {
+      var d = data.dompet;
+
+      if (d.kasRt) {
+        setElText_('pocketKasRtSaldo', formatRupiahLocal_(d.kasRt.saldo));
+        setElText_('pocketKasRtMasuk', formatRupiahLocal_(d.kasRt.masuk));
+        setElText_('pocketKasRtKeluar', formatRupiahLocal_(d.kasRt.keluar));
+      }
+
+      if (d.kasDuka) {
+        setElText_('pocketKasDukaSaldo', formatRupiahLocal_(d.kasDuka.saldo));
+        setElText_('pocketKasDukaMasuk', formatRupiahLocal_(d.kasDuka.masuk));
+        setElText_('pocketKasDukaKeluar', formatRupiahLocal_(d.kasDuka.keluar));
+      }
+
+      if (d.kasSampah) {
+        setElText_('pocketKasSampahSaldo', formatRupiahLocal_(d.kasSampah.saldo));
+        setElText_('pocketKasSampahMasuk', formatRupiahLocal_(d.kasSampah.masuk));
+        setElText_('pocketKasSampahKeluar', formatRupiahLocal_(d.kasSampah.keluar));
+      }
+
+      if (d.kasSosial) {
+        setElText_('pocketKasSosialSaldo', formatRupiahLocal_(d.kasSosial.saldo));
+        setElText_('pocketKasSosialMasuk', formatRupiahLocal_(d.kasSosial.masuk));
+        setElText_('pocketKasSosialKeluar', formatRupiahLocal_(d.kasSosial.keluar));
+      }
     }
 
-    for (var i = 0; i < res.data.length; i++) {
-      var d = res.data[i];
-      var tr = document.createElement('tr');
-      tr.className = 'border-b border-slate-200';
-      tr.innerHTML = 
-        '<td class="p-2 border border-slate-300 font-mono font-bold text-slate-900">' + d.noKuitansi + '</td>' +
-        '<td class="p-2 border border-slate-300 font-semibold text-slate-800">' + d.namaWarga + '</td>' +
-        '<td class="p-2 border border-slate-300 text-slate-700">' + d.jenisIuran + '</td>' +
-        '<td class="p-2 border border-slate-300 text-slate-600">' + d.bulanTahun + '</td>' +
-        '<td class="p-2 border border-slate-300 text-right font-bold text-slate-900">' + formatRupiah(d.nominal) + '</td>' +
-        '<td class="p-2 border border-slate-300 text-center text-slate-500 text-[10px]">' + (d.tanggalBayar || '-') + '</td>';
-      tbody.appendChild(tr);
+    /* 2. Render Monitoring Kepatuhan KK */
+    if (data.kepatuhan) {
+      var kp = data.kepatuhan;
+      setElText_('kepatuhanPeriodeBadge', kp.periode || 'September 2026');
+      setElText_('kepatuhanKkText', (kp.lunasKk || 0) + ' dari ' + (kp.totalKk || 0) + ' KK Sudah Melunasi Iuran');
+      setElText_('kepatuhanPersenText', (kp.persentase || 0) + '% Terkumpul');
+      setElText_('kepatuhanBelumLunasCount', (kp.belumLunasCount || 0) + ' KK');
+
+      var bar = document.getElementById('kepatuhanProgressBar');
+      if (bar) bar.style.width = (kp.persentase || 0) + '%';
+
+      var listContainer = document.getElementById('daftarBelumLunasList');
+      if (listContainer) {
+        listContainer.innerHTML = '';
+        var bList = kp.belumLunasList || [];
+        if (bList.length === 0) {
+          listContainer.innerHTML = '<div class="col-span-full p-4 text-center text-emerald-700 bg-emerald-50 rounded-xl border border-emerald-200 text-xs font-bold"><i class="fa-solid fa-circle-check mr-1.5"></i>Seluruh Kepala Keluarga RT 010 sudah melunasi iuran bulan ini.</div>';
+        } else {
+          for (var b = 0; b < bList.length; b++) {
+            var itemKk = bList[b];
+            var cardKk = document.createElement('div');
+            cardKk.className = 'p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between shadow-xs';
+            cardKk.innerHTML = 
+              '<div class="overflow-hidden pr-2">' +
+                '<p class="font-bold text-xs text-slate-900 truncate">' + itemKk.nama + '</p>' +
+                '<p class="text-[10px] text-slate-500 font-mono truncate">KK: ' + itemKk.noKk + '</p>' +
+              '</div>' +
+              '<span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200 whitespace-nowrap">Belum Lunas</span>';
+            listContainer.appendChild(cardKk);
+          }
+        }
+      }
+    }
+
+    /* 3. Render Buku Transparansi Pengeluaran RT */
+    var tExpBody = document.getElementById('bukuPengeluaranTableBody');
+    if (tExpBody) {
+      tExpBody.innerHTML = '';
+      var expList = data.pengeluaranList || data.mutasi || [];
+
+      if (expList.length === 0) {
+        tExpBody.innerHTML = '<tr><td colspan="4" class="p-6 text-center text-slate-400">Belum ada catatan transaksi belanja / pengeluaran RT.</td></tr>';
+        return;
+      }
+
+      for (var e = 0; e < expList.length; e++) {
+        var exp = expList[e];
+        var tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50/80 transition text-slate-700';
+
+        var badgeColor = 'bg-slate-100 text-slate-800 border-slate-200';
+        var kLower = String(exp.kategori || '').toLowerCase();
+        if (kLower.indexOf('sampah') !== -1) badgeColor = 'bg-amber-100 text-amber-800 border-amber-200';
+        else if (kLower.indexOf('kebersihan') !== -1) badgeColor = 'bg-teal-100 text-teal-800 border-teal-200';
+        else if (kLower.indexOf('fasilitas') !== -1) badgeColor = 'bg-indigo-100 text-indigo-800 border-indigo-200';
+        else if (kLower.indexOf('duka') !== -1) badgeColor = 'bg-purple-100 text-purple-800 border-purple-200';
+        else if (kLower.indexOf('kas') !== -1) badgeColor = 'bg-sky-100 text-sky-800 border-sky-200';
+
+        tr.innerHTML = 
+          '<td class="p-3.5 font-medium text-slate-600 whitespace-nowrap">' + (exp.tanggal || '-') + '</td>' +
+          '<td class="p-3.5">' +
+            '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border ' + badgeColor + '">' +
+              (exp.kategori || 'Operasional RT') +
+            '</span>' +
+          '</td>' +
+          '<td class="p-3.5 font-semibold text-slate-800">' + (exp.keterangan || '-') + '</td>' +
+          '<td class="p-3.5 text-right whitespace-nowrap font-bold text-rose-600">- ' + formatRupiahLocal_(exp.nominal || 0) + '</td>';
+
+        tExpBody.appendChild(tr);
+      }
     }
   }
 
+  function setElText_(id, txt) {
+    var el = document.getElementById(id);
+    if (el) el.innerText = txt;
+  }
+
+  function formatRupiahLocal_(val) {
+    if (typeof formatRupiah === 'function') return formatRupiah(val);
+    var number = parseInt(val, 10) || 0;
+    return 'Rp ' + number.toLocaleString('id-ID');
+  }
+
+  function toggleDaftarBelumLunas() {
+    var box = document.getElementById('daftarBelumLunasContainer');
+    var btnText = document.getElementById('btnToggleBelumLunasText');
+    if (!box) return;
+
+    if (box.classList.contains('hidden')) {
+      box.classList.remove('hidden');
+      if (btnText) btnText.innerText = 'Sembunyikan Daftar';
+    } else {
+      box.classList.add('hidden');
+      if (btnText) btnText.innerText = 'Lihat Daftar KK';
+    }
+  }
+
+  function openModalBayarIuran() {
+    var noKk = currentUser ? currentUser.noKk : '';
+    var nama = currentUser ? currentUser.nama : '';
+
+    var d = new Date();
+    var monthsIndo = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    var currentMonthStr = monthsIndo[d.getMonth()] + ' ' + d.getFullYear();
+    var todayIso = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+
+    var ymd = d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2);
+    var randomSuffix = String(Math.floor(100 + Math.random() * 900));
+    var generatedKwi = ymd + randomSuffix;
+
+    var elKwi = document.getElementById('bayarNoKuitansi');
+    var elNama = document.getElementById('bayarNamaWarga');
+    var elJenis = document.getElementById('bayarJenisIuran');
+    var elBulan = document.getElementById('bayarBulanTahun');
+    var elTgl = document.getElementById('bayarTanggal');
+    var elNom = document.getElementById('bayarNominal');
+
+    if (elKwi) elKwi.value = generatedKwi;
+    if (elNama) elNama.value = nama;
+    if (elJenis) elJenis.value = 'Iuran Kas';
+    if (elBulan) elBulan.value = currentMonthStr;
+    if (elTgl) elTgl.value = todayIso;
+    if (elNom) elNom.value = '50000';
+
+    var modal = document.getElementById('modalBayarIuran');
+    if (modal) modal.classList.remove('hidden');
+  }
+
+  function updateDefaultNominalIuran(jenis) {
+    var elNom = document.getElementById('bayarNominal');
+    if (!elNom) return;
+
+    if (jenis === 'Iuran Kas') elNom.value = '50000';
+    else if (jenis === 'Iuran Duka') elNom.value = '20000';
+    else if (jenis === 'Iuran Sampah') elNom.value = '25000';
+    else if (jenis === 'Iuran Sosial') elNom.value = '15000';
+    else elNom.value = '30000';
+  }
+
+  function handleSaveBayarIuran() {
+    var isPengurus = currentUser && (
+      currentUser.role === 'Super Admin' ||
+      currentUser.statusUser === 'Pengurus RT' ||
+      currentUser.role === 'Pengurus RT' ||
+      currentUser.role === 'Ketua RT' ||
+      currentUser.role === 'Bendahara' ||
+      currentUser.role === 'Sekretaris'
+    );
+
+    var payload = {
+      noKuitansi: document.getElementById('bayarNoKuitansi').value,
+      noKk: currentUser ? currentUser.noKk : '',
+      namaWarga: document.getElementById('bayarNamaWarga').value,
+      jenisIuran: document.getElementById('bayarJenisIuran').value,
+      bulanTahun: document.getElementById('bayarBulanTahun').value.trim(),
+      tanggalBayar: document.getElementById('bayarTanggal').value,
+      nominal: parseInt(document.getElementById('bayarNominal').value, 10) || 0,
+      isPengurus: isPengurus,
+      petugas: currentUser ? currentUser.nama : 'Pengurus RT'
+    };
+
+    var btn = document.getElementById('btnSubmitBayarIuran');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Memproses...';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          btn.disabled = false;
+          btn.innerText = 'Kirim Pembayaran';
+          closeModal('modalBayarIuran');
+          if (res && res.success) {
+            showToast(res.message, 'success');
+            fetchIuranData(0);
+            fetchKasRtDetails();
+            refreshData();
+          } else {
+            showToast(res ? res.message : 'Gagal mengirim pembayaran.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.innerText = 'Kirim Pembayaran';
+          showToast('Kesalahan server: ' + err.toString(), 'error');
+        })
+        .saveBayarIuran(payload);
+    } else {
+      setTimeout(function() {
+        btn.disabled = false;
+        btn.innerText = 'Kirim Pembayaran';
+        closeModal('modalBayarIuran');
+        showToast('Pembayaran berhasil disimpan (Demo Mode).', 'success');
+        fetchIuranData(0);
+        fetchKasRtDetails();
+        refreshData();
+      }, 400);
+    }
+  }
+
+  function openModalPengeluaranRutin() {
+    var d = new Date();
+    var monthsIndo = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    var currentMonthStr = monthsIndo[d.getMonth()] + ' ' + d.getFullYear();
+    var todayIso = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+
+    var elTgl = document.getElementById('pengeluaranTanggal');
+    var elBulan = document.getElementById('pengeluaranBulanTahun');
+    var elKat = document.getElementById('pengeluaranKategori');
+    var elKet = document.getElementById('pengeluaranKeterangan');
+    var elNom = document.getElementById('pengeluaranNominal');
+
+    if (elTgl) elTgl.value = todayIso;
+    if (elBulan) elBulan.value = currentMonthStr;
+    if (elKat) elKat.value = 'Iuran Kas';
+    if (elKet) elKet.value = '';
+    if (elNom) elNom.value = '';
+
+    var modal = document.getElementById('modalPengeluaranRutin');
+    if (modal) modal.classList.remove('hidden');
+  }
+
+  function handleSavePengeluaranRutin() {
+    var payload = {
+      tanggal: document.getElementById('pengeluaranTanggal').value,
+      bulanTahun: document.getElementById('pengeluaranBulanTahun').value.trim(),
+      kategori: document.getElementById('pengeluaranKategori').value,
+      keterangan: document.getElementById('pengeluaranKeterangan').value.trim(),
+      nominal: parseInt(document.getElementById('pengeluaranNominal').value, 10) || 0
+    };
+
+    var btn = document.getElementById('btnSavePengeluaranRutin');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Menyimpan...';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.savePengeluaranRutin) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          btn.disabled = false;
+          btn.innerText = 'Simpan Pengeluaran';
+          closeModal('modalPengeluaranRutin');
+          if (res && res.success) {
+            showToast(res.message, 'success');
+            fetchKasRtDetails();
+            refreshData();
+          } else {
+            showToast(res ? res.message : 'Gagal mencatat pengeluaran.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.innerText = 'Simpan Pengeluaran';
+          showToast('Kesalahan server: ' + err.toString(), 'error');
+        })
+        .savePengeluaranRutin(payload);
+    } else {
+      setTimeout(function() {
+        btn.disabled = false;
+        btn.innerText = 'Simpan Pengeluaran';
+        closeModal('modalPengeluaranRutin');
+        showToast('Pengeluaran rutin dicatat (Demo Mode).', 'success');
+        fetchKasRtDetails();
+        refreshData();
+      }, 400);
+    }
+  }
+
+  function handleVerifikasiIuran(idIuran, targetStatus) {
+    var verifikator = currentUser ? (currentUser.nama + ' (' + (currentUser.role || 'Pengurus RT') + ')') : 'Pengurus RT';
+    showToast('Memproses verifikasi...', 'info');
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success) {
+            showToast(res.message, 'success');
+            fetchIuranData(currentIuranOffset);
+            fetchKasRtDetails();
+            refreshData();
+          } else {
+            showToast(res ? res.message : 'Gagal memperbarui status.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          showToast('Kesalahan server: ' + err.toString(), 'error');
+        })
+        .updateStatusIuran({
+          idIuran: idIuran,
+          status: targetStatus,
+          verifikator: verifikator
+        });
+    } else {
+      setTimeout(function() {
+        showToast('Status iuran diperbarui menjadi ' + targetStatus + ' (Demo)', 'success');
+        fetchIuranData(currentIuranOffset);
+        fetchKasRtDetails();
+        refreshData();
+      }, 300);
+    }
+  }
+
+  function openModalExportPdfLaporan() {
+    var modal = document.getElementById('modalExportPdfLaporan');
+    if (modal) modal.classList.remove('hidden');
+    generatePdfPrintPreview();
+  }
+
+  function generatePdfPrintPreview() {
+    var filterSel = document.getElementById('pdfFilterJenis');
+    var filterJenis = filterSel ? filterSel.value : 'SEMUA';
+
+    var d = new Date();
+    var monthsIndo = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    var todayStr = ('0' + d.getDate()).slice(-2) + ' ' + monthsIndo[d.getMonth()] + ' ' + d.getFullYear();
+    var periodeLabel = monthsIndo[d.getMonth()] + ' ' + d.getFullYear();
+
+    var elPrintDate = document.getElementById('pdfPrintDate');
+    var elPeriode = document.getElementById('pdfReportPeriodeLabel');
+    var tbody = document.getElementById('pdfReportTbody');
+
+    if (elPrintDate) elPrintDate.innerText = todayStr;
+    if (elPeriode) elPeriode.innerText = 'Periode: ' + periodeLabel;
+
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">Memuat data kuitansi resmi...</td></tr>';
+    }
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success) {
+            renderPdfReportRows(res.data);
+          }
+        })
+        .getAllIuranForExport(filterJenis);
+    } else {
+      setTimeout(function() {
+        renderPdfReportRows([
+          { noKuitansi: '2026090101', namaWarga: 'Budi Santoso', jenisIuran: 'Iuran Kas', bulanTahun: 'September 2026', nominal: 50000, tanggalBayar: '01/09/2026' },
+          { noKuitansi: '2026090102', namaWarga: 'Budi Santoso', jenisIuran: 'Iuran Duka', bulanTahun: 'September 2026', nominal: 20000, tanggalBayar: '01/09/2026' },
+          { noKuitansi: '2026090105', namaWarga: 'Haji Abdullah', jenisIuran: 'Iuran Kas', bulanTahun: 'September 2026', nominal: 50000, tanggalBayar: '01/09/2026' }
+        ]);
+      }, 250);
+    }
+  }
+
+  function renderPdfReportRows(list) {
+    var tbody = document.getElementById('pdfReportTbody');
+    var elTotal = document.getElementById('pdfReportTotal');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+    var total = 0;
+
+    if (!list || list.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">Tidak ada data iuran terverifikasi untuk filter ini.</td></tr>';
+      if (elTotal) elTotal.innerText = 'Rp 0';
+      return;
+    }
+
+    for (var i = 0; i < list.length; i++) {
+      var itm = list[i];
+      total += (itm.nominal || 0);
+
+      var tr = document.createElement('tr');
+      tr.className = 'border-b border-slate-300';
+
+      tr.innerHTML = 
+        '<td class="p-2 border border-slate-300 font-mono">' + (itm.noKuitansi || '-') + '</td>' +
+        '<td class="p-2 border border-slate-300 font-semibold">' + (itm.namaWarga || '-') + '</td>' +
+        '<td class="p-2 border border-slate-300">' + (itm.jenisIuran || '-') + '</td>' +
+        '<td class="p-2 border border-slate-300">' + (itm.bulanTahun || '-') + '</td>' +
+        '<td class="p-2 border border-slate-300 text-right font-bold">' + formatRupiahLocal_(itm.nominal || 0) + '</td>' +
+        '<td class="p-2 border border-slate-300 text-center">' + (itm.tanggalBayar || '-') + '</td>';
+
+      tbody.appendChild(tr);
+    }
+
+    if (elTotal) elTotal.innerText = formatRupiahLocal_(total);
+  }
+
   function triggerPrintPdf() {
-    window.print();
+    var printArea = document.getElementById('pdfPrintableArea');
+    if (!printArea) return;
+
+    var printWindow = window.open('', '_blank', 'width=850,height=1100');
+    printWindow.document.write('<html><head><title>Laporan Keuangan RT 010</title>');
+    printWindow.document.write('<link rel="stylesheet" href="https://cdn.tailwindcss.com">');
+    printWindow.document.write('<style>body { font-family: sans-serif; background: white; margin: 20px; } table { border-collapse: collapse; width: 100%; } th, td { border: 1px solid #cbd5e1; padding: 6px; } @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }</style>');
+    printWindow.document.write('</head><body>');
+    printWindow.document.write(printArea.outerHTML);
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+
+    setTimeout(function() {
+      printWindow.focus();
+      printWindow.print();
+    }, 500);
   }
 </script>
