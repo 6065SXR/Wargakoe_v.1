@@ -4,14 +4,15 @@
       extend: {
         colors: {
           brand: {
-            indigo: '#221d52',
-            dark: '#18143d',
-            amber: '#f7941d',
-            pink: '#e85675',
-            cyan: '#67d4e4',
-            lavender: '#e0e2f8',
-            bg: '#f4f6fa',
-            neon: '#00ffaa'
+            indigo: '#181245',   /* Deep Royal Navy (Sidebar) */
+            dark: '#0f172a',     /* Deep Slate for high-contrast text */
+            amber: '#fba419',    /* Warm Amber Gold */
+            orange: '#f97316',   /* Vibrant Tangerine */
+            pink: '#ff5e6c',     /* Coral Rose Glow */
+            cyan: '#0ea5e9',     /* Sky Cyan */
+            lavender: '#f1f5f9', /* Soft light slate */
+            bg: '#f4f6fb',       /* Clean Soft Gray-White Base Canvas */
+            neon: '#10b981'      /* Fresh Emerald Green */
           }
         },
         fontFamily: {
@@ -24,13 +25,13 @@
 
 <style>
   body {
-    background-color: #f4f6fa;
+    background-color: #f4f6fb;
     font-family: 'Plus Jakarta Sans', sans-serif;
-    color: #1e293b;
+    color: #0f172a;
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* Custom Scrollbar */
+  /* Custom Scrollbar Clean */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -51,14 +52,18 @@
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* Active Sidebar Notch Curve effect */
+  /* Active Sidebar Notch Curve effect (Menyatu ke Kanvas Abu-Putih #f4f6fb) */
   .nav-item-active {
-    background-color: #f4f6fa;
-    color: #221d52 !important;
-    font-weight: 700;
-    border-top-left-radius: 1.5rem;
-    border-bottom-left-radius: 1.5rem;
+    background-color: #f4f6fb !important;
+    color: #181245 !important;
+    font-weight: 800;
+    border-top-left-radius: 1.75rem;
+    border-bottom-left-radius: 1.75rem;
     position: relative;
+    box-shadow: -4px 0 15px -4px rgba(0, 0, 0, 0.06);
+  }
+  .nav-item-active i {
+    color: #0ea5e9 !important;
   }
   .nav-item-active::before {
     content: '';
@@ -69,7 +74,7 @@
     height: 20px;
     background-color: transparent;
     border-bottom-right-radius: 20px;
-    box-shadow: 8px 8px 0 0 #f4f6fa;
+    box-shadow: 6px 6px 0 0 #f4f6fb;
     pointer-events: none;
   }
   .nav-item-active::after {
@@ -81,39 +86,143 @@
     height: 20px;
     background-color: transparent;
     border-top-right-radius: 20px;
-    box-shadow: 8px -8px 0 0 #f4f6fa;
+    box-shadow: 6px -6px 0 0 #f4f6fb;
     pointer-events: none;
   }
 
-  /* Input Pill Rounded styling */
+  /* Input Pill Clean Styling */
   .input-pill {
     border-radius: 9999px;
     padding: 0.75rem 1.25rem;
-    border: 1.5px solid #e2e8f0;
+    border: 1.5px solid #cbd5e1;
     background-color: #ffffff;
+    color: #0f172a;
     outline: none;
-    transition: all 0.2s ease;
+    transition: all 0.25s ease;
   }
   .input-pill:focus {
-    border-color: #f7941d;
-    box-shadow: 0 0 0 4px rgba(247, 148, 29, 0.15);
+    border-color: #0ea5e9;
+    background-color: #ffffff;
+    box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.15);
+  }
+  .input-pill option {
+    background-color: #ffffff;
+    color: #0f172a;
   }
 
-  /* Dashboard Card Styling */
+  /* Clean White Dashboard Cards */
   .dashboard-card {
     background: #ffffff;
-    border-radius: 1.25rem;
-    box-shadow: 0 10px 25px -5px rgba(34, 29, 82, 0.05), 0 8px 10px -6px rgba(34, 29, 82, 0.03);
-    border: 1px solid rgba(226, 232, 240, 0.8);
+    border-radius: 1.5rem;
+    box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.04), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+    border: 1px solid #e2e8f0;
+    color: #0f172a;
+    transition: all 0.25s ease;
   }
-  
-  /* Splash Screen Blob */
-  .blob-shape {
-    border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%;
-    animation: morph 6s ease-in-out infinite;
+  .dashboard-card:hover {
+    box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.07);
+    border-color: #cbd5e1;
   }
-  @keyframes morph {
-    0%, 100% { border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%; }
-    50% { border-radius: 70% 30% 46% 54% / 30% 65% 35% 70%; }
+
+  /* Vibrant Warm Greeting Banner */
+  #greetingBanner {
+    background: linear-gradient(135deg, #f59e0b 0%, #f97316 45%, #ff5e6c 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    box-shadow: 0 15px 30px -8px rgba(249, 115, 22, 0.35) !important;
+  }
+
+  /* Dark Accent Widget */
+  .dark-widget-card {
+    background: #181245;
+    border-radius: 1.5rem;
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 12px 28px -6px rgba(24, 18, 69, 0.3);
+  }
+
+  /* Splash Screen Handshake Animations */
+  .anim-hand-left {
+    transform-origin: bottom left;
+    animation: nokiaHandLeft 1.25s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  }
+
+  .anim-hand-right {
+    transform-origin: bottom right;
+    animation: nokiaHandRight 1.25s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  }
+
+  .anim-clasp-pulse {
+    animation: claspGlow 1.25s ease-out forwards;
+  }
+
+  @keyframes nokiaHandLeft {
+    0% {
+      transform: translateX(-120px) translateY(35px) rotate(-24deg);
+      opacity: 0;
+    }
+    40% {
+      transform: translateX(-12px) translateY(0px) rotate(-6deg);
+      opacity: 1;
+    }
+    55% {
+      transform: translateX(0px) translateY(6px) rotate(2deg);
+    }
+    70% {
+      transform: translateX(0px) translateY(-4px) rotate(-3deg);
+    }
+    85% {
+      transform: translateX(0px) translateY(2px) rotate(1deg);
+    }
+    100% {
+      transform: translateX(0px) translateY(0px) rotate(0deg);
+      opacity: 1;
+    }
+  }
+
+  @keyframes nokiaHandRight {
+    0% {
+      transform: translateX(120px) translateY(-35px) rotate(24deg);
+      opacity: 0;
+    }
+    40% {
+      transform: translateX(12px) translateY(0px) rotate(6deg);
+      opacity: 1;
+    }
+    55% {
+      transform: translateX(0px) translateY(6px) rotate(-2deg);
+    }
+    70% {
+      transform: translateX(0px) translateY(-4px) rotate(3deg);
+    }
+    85% {
+      transform: translateX(0px) translateY(2px) rotate(-1deg);
+    }
+    100% {
+      transform: translateX(0px) translateY(0px) rotate(0deg);
+      opacity: 1;
+    }
+  }
+
+  @keyframes claspGlow {
+    0%, 35% {
+      transform: scale(0.2);
+      opacity: 0;
+    }
+    45% {
+      transform: scale(1.4);
+      opacity: 1;
+    }
+    60% {
+      transform: scale(0.95);
+      opacity: 0.7;
+    }
+    80% {
+      transform: scale(1.1);
+      opacity: 0.85;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 0.75;
+    }
   }
 </style>
