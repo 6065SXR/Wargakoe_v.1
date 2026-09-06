@@ -147,6 +147,23 @@ function importWargaBatch(wargaArray) {
   }
 }
 
+function ensureAnggotaKtpHeader_(sheet) {
+  var lastCol = sheet.getLastColumn();
+  if (lastCol === 0) return [];
+  var headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+  if (headers.indexOf('No_KTP') === -1) {
+    var newCol = lastCol + 1;
+    var cell = sheet.getRange(1, newCol);
+    cell.setValue('No_KTP');
+    cell.setBackground('#221d52');
+    cell.setFontColor('#ffffff');
+    cell.setFontWeight('bold');
+    cell.setHorizontalAlignment('center');
+    headers.push('No_KTP');
+  }
+  return headers;
+}
+
 function getFamilyDetails(noKk) {
   try {
     var userSheet = getSheet_('USERS');
@@ -182,16 +199,26 @@ function getFamilyDetails(noKk) {
     var anggotaList = [];
     if (agtData.length > 1) {
       var aHeaders = agtData[0];
+      var aIdIdx = aHeaders.indexOf('ID_Anggota');
+      var aKkIdx = aHeaders.indexOf('No_KK');
+      var aKtpIdx = aHeaders.indexOf('No_KTP');
+      var aNamaIdx = aHeaders.indexOf('Nama_Anggota');
+      var aHubIdx = aHeaders.indexOf('Hubungan_Keluarga');
+      var aTglIdx = aHeaders.indexOf('Tanggal_Lahir');
+      var aUmurIdx = aHeaders.indexOf('Umur');
+      var aGenIdx = aHeaders.indexOf('Jenis_Kelamin');
+
       for (var j = 1; j < agtData.length; j++) {
-        if (agtData[j][aHeaders.indexOf('No_KK')] === String(noKk).trim()) {
+        if (agtData[j][aKkIdx] === String(noKk).trim()) {
           anggotaList.push({
-            idAnggota: agtData[j][aHeaders.indexOf('ID_Anggota')],
-            noKk: agtData[j][aHeaders.indexOf('No_KK')],
-            namaAnggota: agtData[j][aHeaders.indexOf('Nama_Anggota')],
-            hubunganKeluarga: agtData[j][aHeaders.indexOf('Hubungan_Keluarga')],
-            tanggalLahir: agtData[j][aHeaders.indexOf('Tanggal_Lahir')],
-            umur: agtData[j][aHeaders.indexOf('Umur')],
-            jenisKelamin: agtData[j][aHeaders.indexOf('Jenis_Kelamin')]
+            idAnggota: agtData[j][aIdIdx],
+            noKk: agtData[j][aKkIdx],
+            noKtp: aKtpIdx !== -1 ? agtData[j][aKtpIdx] : '',
+            namaAnggota: agtData[j][aNamaIdx],
+            hubunganKeluarga: agtData[j][aHubIdx],
+            tanggalLahir: agtData[j][aTglIdx],
+            umur: agtData[j][aUmurIdx],
+            jenisKelamin: agtData[j][aGenIdx]
           });
         }
       }
@@ -203,18 +230,172 @@ function getFamilyDetails(noKk) {
   }
 }
 
+function updateProfilWarga(payload) {
+  try {
+    var sheet = getSheet_('USERS');
+    var rawData = sheet.getDataRange().getDisplayValues();
+    var headers = rawData[0];
+
+    var origNoKk = String(payload.origNoKk || '').trim();
+    var inputKtp = String(payload.noKtp || '').trim();
+    var isSuperAdmin = Boolean(payload.isSuperAdmin);
+    var targetNoKk = isSuperAdmin ? String(payload.noKk || origNoKk).trim() : origNoKk;
+
+    if (!origNoKk) {
+      return { success: false, message: 'Nomor KK asal tidak valid!' };
+    }
+
+    if (!inputKtp || inputKtp.length !== 16 || isNaN(inputKtp)) {
+      return { success: false, message: 'Nomor NIK/KTP wajib 16 digit angka!' };
+    }
+
+    // 1. Temukan baris user di tabel USERS
+    var userRowIndex = -1;
+    var uKkIdx = headers.indexOf('No_KK');
+    var uKtpIdx = headers.indexOf('No_KTP');
+    var uNamaIdx = headers.indexOf('Nama');
+    var uHpIdx = headers.indexOf('No_HP');
+    var uPassIdx = headers.indexOf('Password');
+    var uRoleIdx = headers.indexOf('Role');
+    var uStatusUserIdx = headers.indexOf('Status_User');
+    var uTglIdx = headers.indexOf('Tanggal_Lahir');
+    var uUmurIdx = headers.indexOf('Umur');
+    var uAlamatIdx = headers.indexOf('Alamat');
+    var uGenIdx = headers.indexOf('Jenis_Kelamin');
+    var uHubIdx = headers.indexOf('Status_Keluarga');
+    var uRumahIdx = headers.indexOf('Status_Rumah');
+    var uPendIdx = headers.indexOf('Pendidikan');
+    var uPekIdx = headers.indexOf('Pekerjaan');
+
+    for (var i = 1; i < rawData.length; i++) {
+      if (rawData[i][uKkIdx] === origNoKk) {
+        userRowIndex = i + 1; // 1-based index di Google Sheets
+        break;
+      }
+    }
+
+    if (userRowIndex === -1) {
+      return { success: false, message: 'Data pengguna tidak ditemukan di database!' };
+    }
+
+    // 2. Validasi Anti-Duplikasi NIK ke akun lain di tabel USERS
+    for (var u = 1; u < rawData.length; u++) {
+      if (u + 1 !== userRowIndex && rawData[u][uKtpIdx] === inputKtp) {
+        return { success: false, message: 'Nomor NIK/KTP (' + inputKtp + ') sudah digunakan oleh warga lain!' };
+      }
+    }
+
+    // 3. Validasi Anti-Duplikasi NIK ke tabel ANGGOTA_KELUARGA
+    var agtSheet = getSheet_('ANGGOTA_KELUARGA');
+    var agtData = agtSheet.getDataRange().getDisplayValues();
+    if (agtData.length > 1) {
+      var aKtpIdx = agtData[0].indexOf('No_KTP');
+      if (aKtpIdx !== -1) {
+        for (var a = 1; a < agtData.length; a++) {
+          if (agtData[a][aKtpIdx] === inputKtp) {
+            return { success: false, message: 'Nomor NIK/KTP (' + inputKtp + ') sudah terdaftar pada anggota keluarga lain!' };
+          }
+        }
+      }
+    }
+
+    // 4. Update data baris pengguna di tabel USERS
+    if (isSuperAdmin && targetNoKk !== origNoKk) {
+      sheet.getRange(userRowIndex, uKkIdx + 1).setValue(targetNoKk);
+    }
+    sheet.getRange(userRowIndex, uKtpIdx + 1).setValue(inputKtp);
+    sheet.getRange(userRowIndex, uNamaIdx + 1).setValue(payload.nama);
+    sheet.getRange(userRowIndex, uHpIdx + 1).setValue(payload.noHp);
+    sheet.getRange(userRowIndex, uTglIdx + 1).setValue(payload.tanggalLahir);
+    sheet.getRange(userRowIndex, uUmurIdx + 1).setValue(payload.umur);
+    sheet.getRange(userRowIndex, uAlamatIdx + 1).setValue(payload.alamat);
+    sheet.getRange(userRowIndex, uGenIdx + 1).setValue(payload.jenisKelamin);
+    sheet.getRange(userRowIndex, uHubIdx + 1).setValue(payload.statusKeluarga);
+    sheet.getRange(userRowIndex, uRumahIdx + 1).setValue(payload.statusRumah);
+    sheet.getRange(userRowIndex, uPendIdx + 1).setValue(payload.pendidikan);
+    sheet.getRange(userRowIndex, uPekIdx + 1).setValue(payload.pekerjaan);
+
+    // Update password hanya jika kolom password baru diisi
+    if (payload.password && String(payload.password).trim() !== '') {
+      sheet.getRange(userRowIndex, uPassIdx + 1).setValue(String(payload.password).trim());
+    }
+
+    SpreadsheetApp.flush();
+
+    // Susun objek user terbaru untuk sinkronisasi sesi frontend
+    var updatedRow = sheet.getRange(userRowIndex, 1, 1, headers.length).getDisplayValues()[0];
+    var updatedUser = {
+      noKk: updatedRow[uKkIdx],
+      noKtp: updatedRow[uKtpIdx],
+      nama: updatedRow[uNamaIdx],
+      noHp: updatedRow[uHpIdx],
+      role: updatedRow[uRoleIdx],
+      statusUser: updatedRow[uStatusUserIdx],
+      tanggalLahir: updatedRow[uTglIdx],
+      umur: updatedRow[uUmurIdx],
+      alamat: updatedRow[uAlamatIdx],
+      jenisKelamin: updatedRow[uGenIdx],
+      statusKeluarga: updatedRow[uHubIdx],
+      statusRumah: updatedRow[uRumahIdx],
+      pendidikan: updatedRow[uPendIdx],
+      pekerjaan: updatedRow[uPekIdx]
+    };
+
+    return { 
+      success: true, 
+      message: 'Data profil kepala keluarga berhasil diperbarui!',
+      user: updatedUser 
+    };
+  } catch (error) {
+    return { success: false, message: 'Gagal memperbarui profil: ' + error.toString() };
+  }
+}
+
 function saveAnggotaKeluarga(payload) {
   try {
     var sheet = getSheet_('ANGGOTA_KELUARGA');
-    var data = sheet.getDataRange().getDisplayValues();
-    var headers = data[0];
+    var rawData = sheet.getDataRange().getDisplayValues();
+    var headers = ensureAnggotaKtpHeader_(sheet);
     var nowStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
     var isEdit = payload.idAnggota && payload.idAnggota.trim() !== '';
+    var inputKtp = String(payload.noKtp || '').trim();
+
+    if (!inputKtp || inputKtp.length !== 16 || isNaN(inputKtp)) {
+      return { success: false, message: 'Nomor NIK/KTP wajib 16 digit angka!' };
+    }
+
+    // 1. VALIDASI ANTI-DUPLIKASI: Periksa tabel USERS (Kepala Keluarga / Pengurus RT)
+    var userSheet = getSheet_('USERS');
+    var userData = userSheet.getDataRange().getDisplayValues();
+    if (userData.length > 1) {
+      var uHeaders = userData[0];
+      var uKtpIdx = uHeaders.indexOf('No_KTP');
+      for (var u = 1; u < userData.length; u++) {
+        if (userData[u][uKtpIdx] === inputKtp) {
+          return { success: false, message: 'Nomor NIK/KTP (' + inputKtp + ') sudah terdaftar pada akun warga/kepala keluarga lain!' };
+        }
+      }
+    }
+
+    // 2. VALIDASI ANTI-DUPLIKASI: Periksa tabel ANGGOTA_KELUARGA
+    var aKtpIdx = headers.indexOf('No_KTP');
+    var aIdIdx = headers.indexOf('ID_Anggota');
+    if (rawData.length > 1) {
+      for (var a = 1; a < rawData.length; a++) {
+        if (rawData[a][aKtpIdx] === inputKtp) {
+          if (isEdit && rawData[a][aIdIdx] === payload.idAnggota) {
+            continue; // data yang sama saat mode edit
+          }
+          return { success: false, message: 'Nomor NIK/KTP (' + inputKtp + ') sudah terdaftar pada anggota keluarga lain!' };
+        }
+      }
+    }
 
     if (isEdit) {
-      for (var i = 1; i < data.length; i++) {
-        if (data[i][headers.indexOf('ID_Anggota')] === payload.idAnggota) {
+      for (var i = 1; i < rawData.length; i++) {
+        if (rawData[i][headers.indexOf('ID_Anggota')] === payload.idAnggota) {
           var r = i + 1;
+          sheet.getRange(r, headers.indexOf('No_KTP') + 1).setValue(inputKtp);
           sheet.getRange(r, headers.indexOf('Nama_Anggota') + 1).setValue(payload.namaAnggota);
           sheet.getRange(r, headers.indexOf('Hubungan_Keluarga') + 1).setValue(payload.hubunganKeluarga);
           sheet.getRange(r, headers.indexOf('Tanggal_Lahir') + 1).setValue(payload.tanggalLahir);
@@ -227,7 +408,22 @@ function saveAnggotaKeluarga(payload) {
     }
 
     var newId = generateSequentialId_('AGT', 'ANGGOTA_KELUARGA');
-    sheet.appendRow([newId, String(payload.noKk).trim(), String(payload.namaAnggota).trim(), String(payload.hubunganKeluarga).trim(), String(payload.tanggalLahir).trim(), String(payload.umur || '0').trim(), String(payload.jenisKelamin || 'Laki-laki').trim(), nowStr]);
+    var newRow = new Array(headers.length);
+    for (var h = 0; h < headers.length; h++) {
+      var col = headers[h];
+      if (col === 'ID_Anggota') newRow[h] = newId;
+      else if (col === 'No_KK') newRow[h] = String(payload.noKk).trim();
+      else if (col === 'No_KTP') newRow[h] = inputKtp;
+      else if (col === 'Nama_Anggota') newRow[h] = String(payload.namaAnggota).trim();
+      else if (col === 'Hubungan_Keluarga') newRow[h] = String(payload.hubunganKeluarga).trim();
+      else if (col === 'Tanggal_Lahir') newRow[h] = String(payload.tanggalLahir).trim();
+      else if (col === 'Umur') newRow[h] = String(payload.umur || '0').trim();
+      else if (col === 'Jenis_Kelamin') newRow[h] = String(payload.jenisKelamin || 'Laki-laki').trim();
+      else if (col === 'Created_At') newRow[h] = nowStr;
+      else newRow[h] = '';
+    }
+
+    sheet.appendRow(newRow);
     SpreadsheetApp.flush();
     return { success: true, message: 'Anggota keluarga baru berhasil ditambahkan!', idAnggota: newId };
   } catch (error) {
