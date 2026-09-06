@@ -32,6 +32,7 @@ var DB_SCHEMA = {
     headers: [
       'ID_Anggota',
       'No_KK',
+      'No_KTP',
       'Nama_Anggota',
       'Hubungan_Keluarga',
       'Tanggal_Lahir',
@@ -374,7 +375,6 @@ function seedInitialData_(ss) {
     pinjamSheet.getRange(2, 1, dummyPinjam.length, dummyPinjam[0].length).setValues(dummyPinjam);
   }
 
-  // Seed Awal Jadwal Ronda
   var rondaSheet = ss.getSheetByName(DB_SCHEMA.JADWAL_RONDA.name);
   if (rondaSheet && rondaSheet.getLastRow() <= 1) {
     var dummyWargaList = JSON.stringify([
