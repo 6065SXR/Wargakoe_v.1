@@ -1,4 +1,6 @@
 <script>
+  var currentKepalaKeluargaData = null;
+
   function fetchFamilyData(targetKk) {
     var noKk = targetKk || (currentUser ? currentUser.noKk : '');
     if (!noKk) return;
@@ -14,8 +16,23 @@
     } else {
       setTimeout(function() {
         renderFamilyDetails({
-          kepalaKeluarga: { nama: 'Budi Santoso', noKk: noKk, alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim' },
-          anggota: [{ idAnggota: 'AGT-0001', noKk: noKk, namaAnggota: 'Dewi Lestari', hubunganKeluarga: 'Istri', tanggalLahir: '12/04/1988', umur: '36', jenisKelamin: 'Perempuan' }]
+          kepalaKeluarga: { 
+            nama: currentUser ? currentUser.nama : 'Budi Santoso', 
+            noKk: noKk, 
+            noKtp: currentUser ? currentUser.noKtp : '3171010101850001',
+            noHp: currentUser ? currentUser.noHp : '081234567890',
+            tanggalLahir: currentUser ? (currentUser.tanggalLahir || '1985-01-15') : '1985-01-15',
+            umur: currentUser ? (currentUser.umur || '39') : '39',
+            jenisKelamin: currentUser ? (currentUser.jenisKelamin || 'Laki-laki') : 'Laki-laki',
+            statusKeluarga: currentUser ? (currentUser.statusKeluarga || 'Suami') : 'Suami',
+            statusRumah: currentUser ? (currentUser.statusRumah || 'Pribadi') : 'Pribadi',
+            pendidikan: currentUser ? (currentUser.pendidikan || 'Sarjana') : 'Sarjana',
+            pekerjaan: currentUser ? (currentUser.pekerjaan || 'Pegawai Negeri') : 'Pegawai Negeri',
+            alamat: currentUser ? (currentUser.alamat || 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim') : 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim' 
+          },
+          anggota: [
+            { idAnggota: 'AGT-0001', noKk: noKk, noKtp: '3171010101880001', namaAnggota: 'Dewi Lestari', hubunganKeluarga: 'Istri', tanggalLahir: '1988-04-12', umur: '36', jenisKelamin: 'Perempuan' }
+          ]
         });
       }, 300);
     }
@@ -24,6 +41,7 @@
   function renderFamilyDetails(data) {
     if (!data) return;
     if (data.kepalaKeluarga) {
+      currentKepalaKeluargaData = data.kepalaKeluarga;
       currentFamilyNoKk = data.kepalaKeluarga.noKk;
       document.getElementById('myFamilyHeadName').innerText = data.kepalaKeluarga.nama;
       document.getElementById('myFamilyKkNumber').innerText = data.kepalaKeluarga.noKk;
@@ -40,23 +58,212 @@
       var card = document.createElement('div');
       card.className = 'p-4 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-between hover:shadow-md transition';
       var icon = agt.jenisKelamin === 'Perempuan' ? 'fa-female text-pink-500' : 'fa-male text-indigo-500';
+      var ktpDisplay = agt.noKtp ? ('NIK: ' + agt.noKtp) : 'NIK: -';
 
       card.innerHTML = 
         '<div class="flex items-center gap-3">' +
-          '<div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-lg"><i class="fa-solid ' + icon + '"></i></div>' +
-          '<div><h5 class="text-xs font-bold text-slate-800">' + agt.namaAnggota + '</h5><p class="text-[11px] text-slate-500">' + agt.hubunganKeluarga + ' • ' + agt.umur + ' Thn</p></div>' +
+          '<div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-lg flex-shrink-0"><i class="fa-solid ' + icon + '"></i></div>' +
+          '<div class="overflow-hidden">' +
+            '<h5 class="text-xs font-bold text-slate-800 truncate">' + agt.namaAnggota + '</h5>' +
+            '<p class="text-[10px] text-brand-indigo font-mono font-bold truncate">' + ktpDisplay + '</p>' +
+            '<p class="text-[11px] text-slate-500">' + agt.hubunganKeluarga + ' • ' + agt.umur + ' Thn</p>' +
+          '</div>' +
         '</div>' +
-        '<div class="flex items-center gap-1">' +
-          '<button onclick="editAnggota(\'' + agt.idAnggota + '\', \'' + encodeURIComponent(agt.namaAnggota) + '\', \'' + encodeURIComponent(agt.hubunganKeluarga) + '\', \'' + encodeURIComponent(agt.tanggalLahir) + '\', \'' + agt.umur + '\', \'' + agt.jenisKelamin + '\')" class="p-2 rounded-lg text-slate-400 hover:text-brand-indigo hover:bg-slate-100 transition text-xs"><i class="fa-solid fa-pen-to-square"></i></button>' +
-          '<button onclick="handleDeleteAnggota(\'' + agt.idAnggota + '\')" class="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition text-xs"><i class="fa-solid fa-trash-can"></i></button>' +
+        '<div class="flex items-center gap-1 flex-shrink-0">' +
+          '<button onclick="editAnggota(\'' + agt.idAnggota + '\', \'' + encodeURIComponent(agt.noKtp || '') + '\', \'' + encodeURIComponent(agt.namaAnggota) + '\', \'' + encodeURIComponent(agt.hubunganKeluarga) + '\', \'' + encodeURIComponent(agt.tanggalLahir) + '\', \'' + agt.umur + '\', \'' + agt.jenisKelamin + '\')" class="p-2 rounded-lg text-slate-400 hover:text-brand-indigo hover:bg-slate-100 transition text-xs" title="Edit Anggota"><i class="fa-solid fa-pen-to-square"></i></button>' +
+          '<button onclick="handleDeleteAnggota(\'' + agt.idAnggota + '\')" class="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition text-xs" title="Hapus Anggota"><i class="fa-solid fa-trash-can"></i></button>' +
         '</div>';
       container.appendChild(card);
+    }
+  }
+
+  function openModalEditProfilKepala() {
+    var data = currentKepalaKeluargaData || currentUser;
+    if (!data) {
+      showToast('Data profil belum siap, silakan coba beberapa saat lagi.', 'error');
+      return;
+    }
+
+    var isSuperAdmin = currentUser && (currentUser.role === 'Super Admin');
+    var noKkVal = data.noKk || (currentUser ? currentUser.noKk : '');
+
+    document.getElementById('editProfilOrigNoKk').value = noKkVal;
+
+    var inputKk = document.getElementById('editProfilNoKk');
+    var badgeKk = document.getElementById('editProfilNoKkBadge');
+    var hintKk = document.getElementById('editProfilNoKkHint');
+
+    inputKk.value = noKkVal;
+
+    if (isSuperAdmin) {
+      inputKk.readOnly = false;
+      inputKk.classList.remove('bg-slate-100', 'cursor-not-allowed', 'text-slate-600');
+      inputKk.classList.add('bg-white', 'text-slate-800');
+      badgeKk.innerText = 'Dapat Diedit (Super Admin)';
+      badgeKk.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800';
+      hintKk.innerText = '* Hak Akses Super Admin: Nomor KK dapat disesuaikan jika diperlukan.';
+      hintKk.className = 'text-[10px] text-emerald-600 mt-1 font-medium';
+    } else {
+      inputKk.readOnly = true;
+      inputKk.classList.remove('bg-white', 'text-slate-800');
+      inputKk.classList.add('bg-slate-100', 'cursor-not-allowed', 'text-slate-600');
+      badgeKk.innerText = 'Terkunci';
+      badgeKk.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800';
+      hintKk.innerText = '* Nomor KK dikunci. Perubahan nomor KK hanya dapat dilakukan dengan izin Super Admin.';
+      hintKk.className = 'text-[10px] text-amber-600 mt-1 font-medium';
+    }
+
+    document.getElementById('editProfilNoKtp').value = data.noKtp || (currentUser ? currentUser.noKtp : '') || '';
+    document.getElementById('editProfilNama').value = data.nama || (currentUser ? currentUser.nama : '') || '';
+    
+    var tglRaw = data.tanggalLahir || (currentUser ? currentUser.tanggalLahir : '') || '';
+    if (tglRaw.indexOf('/') !== -1) {
+      var parts = tglRaw.split('/');
+      if (parts.length === 3) {
+        tglRaw = parts[2] + '-' + ('0' + parts[1]).slice(-2) + '-' + ('0' + parts[0]).slice(-2);
+      }
+    }
+    document.getElementById('editProfilTglLahir').value = tglRaw;
+
+    var umurVal = String(data.umur || (currentUser ? currentUser.umur : 0) || 0);
+    document.getElementById('editProfilUmurVal').value = umurVal;
+    document.getElementById('editProfilUmurDisplay').value = umurVal + ' Tahun';
+
+    document.getElementById('editProfilGender').value = data.jenisKelamin || (currentUser ? currentUser.jenisKelamin : 'Laki-laki') || 'Laki-laki';
+    document.getElementById('editProfilStatusKeluarga').value = data.statusKeluarga || (currentUser ? currentUser.statusKeluarga : 'Suami') || 'Suami';
+    document.getElementById('editProfilStatusRumah').value = data.statusRumah || (currentUser ? currentUser.statusRumah : 'Pribadi') || 'Pribadi';
+    document.getElementById('editProfilPendidikan').value = data.pendidikan || (currentUser ? currentUser.pendidikan : 'SMA') || 'SMA';
+    document.getElementById('editProfilPekerjaan').value = data.pekerjaan || (currentUser ? currentUser.pekerjaan : 'Wiraswasta') || 'Wiraswasta';
+    document.getElementById('editProfilNoHp').value = data.noHp || (currentUser ? currentUser.noHp : '') || '';
+    document.getElementById('editProfilAlamat').value = data.alamat || (currentUser ? currentUser.alamat : '') || '';
+    document.getElementById('editProfilPassword').value = '';
+
+    document.getElementById('modalEditProfilKepala').classList.remove('hidden');
+  }
+
+  function handleSaveProfilKepala() {
+    var ktpVal = document.getElementById('editProfilNoKtp').value.trim();
+    if (!ktpVal || ktpVal.length !== 16 || isNaN(ktpVal)) {
+      showToast('Nomor NIK/KTP wajib 16 digit angka!', 'error');
+      return;
+    }
+
+    var hpVal = document.getElementById('editProfilNoHp').value.trim();
+    if (!hpVal) {
+      showToast('Nomor Handphone wajib diisi!', 'error');
+      return;
+    }
+
+    var payload = {
+      origNoKk: document.getElementById('editProfilOrigNoKk').value,
+      noKk: document.getElementById('editProfilNoKk').value.trim(),
+      noKtp: ktpVal,
+      nama: document.getElementById('editProfilNama').value.trim(),
+      tanggalLahir: document.getElementById('editProfilTglLahir').value,
+      umur: document.getElementById('editProfilUmurVal').value,
+      jenisKelamin: document.getElementById('editProfilGender').value,
+      statusKeluarga: document.getElementById('editProfilStatusKeluarga').value,
+      statusRumah: document.getElementById('editProfilStatusRumah').value,
+      pendidikan: document.getElementById('editProfilPendidikan').value,
+      pekerjaan: document.getElementById('editProfilPekerjaan').value,
+      alamat: document.getElementById('editProfilAlamat').value.trim(),
+      noHp: hpVal,
+      password: document.getElementById('editProfilPassword').value.trim(),
+      isSuperAdmin: currentUser && (currentUser.role === 'Super Admin')
+    };
+
+    var btn = document.getElementById('btnSaveProfilKepala');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i><span>Menyimpan...</span>';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1"></i><span>Simpan Perubahan Profil</span>';
+          if (res && res.success) {
+            closeModal('modalEditProfilKepala');
+            showToast(res.message, 'success');
+
+            if (res.user) {
+              currentUser = res.user;
+              saveStoredSession(currentUser);
+
+              var nameDesk = document.getElementById('userNameDesktop');
+              if (nameDesk) nameDesk.innerText = currentUser.nama;
+              var bannerTxt = document.getElementById('welcomeBannerText');
+              if (bannerTxt) bannerTxt.innerText = 'Halo, ' + currentUser.nama + '!';
+              var avDesk = document.getElementById('userAvatarDesktop');
+              if (avDesk) avDesk.innerText = (currentUser.nama || 'U').charAt(0).toUpperCase();
+
+              currentKepalaKeluargaData = currentUser;
+              currentFamilyNoKk = currentUser.noKk;
+              document.getElementById('myFamilyHeadName').innerText = currentUser.nama;
+              document.getElementById('myFamilyKkNumber').innerText = currentUser.noKk;
+              document.getElementById('myFamilyAddress').innerText = currentUser.alamat || '-';
+            }
+
+            fetchFamilyData(currentFamilyNoKk);
+            refreshData();
+          } else {
+            showToast(res ? res.message : 'Gagal memperbarui profil.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1"></i><span>Simpan Perubahan Profil</span>';
+          showToast('Kesalahan server: ' + err.toString(), 'error');
+        })
+        .updateProfilWarga(payload);
+    } else {
+      setTimeout(function() {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1"></i><span>Simpan Perubahan Profil</span>';
+        closeModal('modalEditProfilKepala');
+
+        if (currentUser) {
+          currentUser.nama = payload.nama;
+          currentUser.noKtp = payload.noKtp;
+          currentUser.noHp = payload.noHp;
+          currentUser.tanggalLahir = payload.tanggalLahir;
+          currentUser.umur = payload.umur;
+          currentUser.jenisKelamin = payload.jenisKelamin;
+          currentUser.statusKeluarga = payload.statusKeluarga;
+          currentUser.statusRumah = payload.statusRumah;
+          currentUser.pendidikan = payload.pendidikan;
+          currentUser.pekerjaan = payload.pekerjaan;
+          currentUser.alamat = payload.alamat;
+          if (payload.isSuperAdmin && payload.noKk) currentUser.noKk = payload.noKk;
+
+          saveStoredSession(currentUser);
+          document.getElementById('userNameDesktop').innerText = currentUser.nama;
+          document.getElementById('welcomeBannerText').innerText = 'Halo, ' + currentUser.nama + '!';
+          document.getElementById('myFamilyHeadName').innerText = currentUser.nama;
+          document.getElementById('myFamilyKkNumber').innerText = currentUser.noKk;
+          document.getElementById('myFamilyAddress').innerText = currentUser.alamat;
+        }
+
+        showToast('Profil Anda berhasil diperbarui (Demo Mode).', 'success');
+        fetchFamilyData(currentFamilyNoKk);
+      }, 500);
     }
   }
 
   function openModalTambahAnggota() {
     document.getElementById('formAnggotaId').value = '';
     document.getElementById('formAnggotaKk').value = currentFamilyNoKk || (currentUser ? currentUser.noKk : '');
+    
+    var ktpInput = document.getElementById('formAnggotaKtp');
+    ktpInput.value = '';
+    ktpInput.readOnly = false;
+    ktpInput.dataset.isAuto = 'false';
+
+    var hintEl = document.getElementById('formAnggotaKtpHint');
+    if (hintEl) {
+      hintEl.innerText = '* Otomatis terisi jika umur < 17 tahun, wajib e-KTP jika ≥ 17 tahun';
+      hintEl.className = 'text-[10px] text-slate-500 mt-1 font-medium';
+    }
+
     document.getElementById('formAnggotaNama').value = '';
     document.getElementById('formAnggotaHubungan').value = 'Istri';
     document.getElementById('formAnggotaTglLahir').value = '';
@@ -67,63 +274,165 @@
     document.getElementById('modalAnggota').classList.remove('hidden');
   }
 
-  function editAnggota(id, namaEnc, hubEnc, tglEnc, umur, gender) {
+  function editAnggota(id, ktpEnc, namaEnc, hubEnc, tglEnc, umur, gender) {
+    var rawKtp = decodeURIComponent(ktpEnc || '');
+    var ageVal = parseInt(umur, 10) || 0;
+
     document.getElementById('formAnggotaId').value = id;
     document.getElementById('formAnggotaKk').value = currentFamilyNoKk || (currentUser ? currentUser.noKk : '');
     document.getElementById('formAnggotaNama').value = decodeURIComponent(namaEnc || '');
     document.getElementById('formAnggotaHubungan').value = decodeURIComponent(hubEnc || '');
     document.getElementById('formAnggotaTglLahir').value = decodeURIComponent(tglEnc || '');
-    document.getElementById('formAnggotaUmurVal').value = umur || '0';
-    document.getElementById('formAnggotaUmurDisplay').value = (umur || '0') + ' Tahun';
+    document.getElementById('formAnggotaUmurVal').value = String(ageVal);
+    document.getElementById('formAnggotaUmurDisplay').value = ageVal + ' Tahun';
     document.getElementById('formAnggotaGender').value = gender || 'Perempuan';
+
+    var ktpInput = document.getElementById('formAnggotaKtp');
+    var hintEl = document.getElementById('formAnggotaKtpHint');
+    ktpInput.value = rawKtp;
+
+    if (ageVal < 17) {
+      if (!rawKtp) {
+        ktpInput.value = generateRandomNik(decodeURIComponent(tglEnc || ''));
+        ktpInput.dataset.isAuto = 'true';
+      } else {
+        ktpInput.dataset.isAuto = 'false';
+      }
+      ktpInput.readOnly = true;
+      if (hintEl) {
+        hintEl.innerText = '* NIK otomatis untuk anak di bawah 17 tahun';
+        hintEl.className = 'text-[10px] text-emerald-600 mt-1 font-semibold';
+      }
+    } else {
+      ktpInput.readOnly = false;
+      ktpInput.dataset.isAuto = 'false';
+      if (hintEl) {
+        hintEl.innerText = '* Wajib 16 digit sesuai e-KTP fisik asli';
+        hintEl.className = 'text-[10px] text-brand-pink mt-1 font-semibold';
+      }
+    }
+
     document.getElementById('modalAnggotaTitle').innerText = 'Edit Data Anggota Keluarga';
     document.getElementById('modalAnggota').classList.remove('hidden');
   }
 
+  function handleAnggotaTglLahirChange(birthDateStr) {
+    if (!birthDateStr) return;
+    calculateAgeRealtime(birthDateStr, 'formAnggotaUmurDisplay', 'formAnggotaUmurVal');
+
+    var age = parseInt(document.getElementById('formAnggotaUmurVal').value, 10) || 0;
+    var ktpInput = document.getElementById('formAnggotaKtp');
+    var hintEl = document.getElementById('formAnggotaKtpHint');
+
+    if (age < 17) {
+      var isAutoOrEmpty = !ktpInput.value || ktpInput.dataset.isAuto === 'true' || ktpInput.readOnly;
+      if (isAutoOrEmpty) {
+        ktpInput.value = generateRandomNik(birthDateStr);
+        ktpInput.dataset.isAuto = 'true';
+      }
+      ktpInput.readOnly = true;
+      if (hintEl) {
+        hintEl.innerText = '* NIK otomatis dibuat (anak < 17 tahun belum memiliki e-KTP)';
+        hintEl.className = 'text-[10px] text-emerald-600 mt-1 font-semibold';
+      }
+    } else {
+      if (ktpInput.dataset.isAuto === 'true') {
+        ktpInput.value = '';
+        ktpInput.dataset.isAuto = 'false';
+      }
+      ktpInput.readOnly = false;
+      if (hintEl) {
+        hintEl.innerText = '* Wajib 16 digit sesuai nomor e-KTP fisik asli';
+        hintEl.className = 'text-[10px] text-brand-pink mt-1 font-semibold';
+      }
+    }
+  }
+
+  function generateRandomNik(birthDateStr) {
+    var prefix = '317101';
+    var datePart = '';
+    if (birthDateStr) {
+      var d = new Date(birthDateStr);
+      if (!isNaN(d.getTime())) {
+        var day = ('0' + d.getDate()).slice(-2);
+        var month = ('0' + (d.getMonth() + 1)).slice(-2);
+        var year = String(d.getFullYear()).slice(-2);
+        datePart = day + month + year;
+      }
+    }
+    if (!datePart || datePart.length !== 6) {
+      var now = new Date();
+      datePart = ('0' + now.getDate()).slice(-2) + ('0' + (now.getMonth() + 1)).slice(-2) + String(now.getFullYear()).slice(-2);
+    }
+    var randomSuffix = String(Math.floor(1000 + Math.random() * 9000));
+    return prefix + datePart + randomSuffix;
+  }
+
   function handleSaveAnggota() {
+    var ktpVal = document.getElementById('formAnggotaKtp').value.trim();
+    if (!ktpVal || ktpVal.length !== 16 || isNaN(ktpVal)) {
+      showToast('Nomor NIK/KTP wajib 16 digit angka!', 'error');
+      return;
+    }
+
     var payload = {
       idAnggota: document.getElementById('formAnggotaId').value,
       noKk: document.getElementById('formAnggotaKk').value || currentFamilyNoKk || (currentUser ? currentUser.noKk : ''),
-      namaAnggota: document.getElementById('formAnggotaNama').value,
+      noKtp: ktpVal,
+      namaAnggota: document.getElementById('formAnggotaNama').value.trim(),
       hubunganKeluarga: document.getElementById('formAnggotaHubungan').value,
       tanggalLahir: document.getElementById('formAnggotaTglLahir').value,
       umur: document.getElementById('formAnggotaUmurVal').value,
       jenisKelamin: document.getElementById('formAnggotaGender').value
     };
+
     var btn = document.getElementById('btnSaveAnggota');
     btn.disabled = true;
     btn.innerText = 'Menyimpan...';
 
     if (typeof google !== 'undefined' && google.script && google.script.run) {
-      google.script.run.withSuccessHandler(function(res) {
-        btn.disabled = false;
-        btn.innerText = 'Simpan Data';
-        closeModal('modalAnggota');
-        if (res && res.success) {
-          showToast(res.message, 'success');
-          fetchFamilyData(currentFamilyNoKk);
-          refreshData();
-        }
-      }).saveAnggotaKeluarga(payload);
+      google.script.run
+        .withSuccessHandler(function(res) {
+          btn.disabled = false;
+          btn.innerText = 'Simpan Data';
+          if (res && res.success) {
+            closeModal('modalAnggota');
+            showToast(res.message, 'success');
+            fetchFamilyData(currentFamilyNoKk);
+            refreshData();
+          } else {
+            showToast(res ? res.message : 'Gagal menyimpan anggota.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.innerText = 'Simpan Data';
+          showToast('Kesalahan server: ' + err.toString(), 'error');
+        })
+        .saveAnggotaKeluarga(payload);
     } else {
       setTimeout(function() {
         btn.disabled = false;
         btn.innerText = 'Simpan Data';
         closeModal('modalAnggota');
-        showToast('Berhasil disimpan.', 'success');
+        showToast('Berhasil disimpan (Demo).', 'success');
         fetchFamilyData(currentFamilyNoKk);
       }, 400);
     }
   }
 
   function handleDeleteAnggota(idAnggota) {
+    if (!confirm('Apakah Anda yakin ingin menghapus anggota keluarga ini?')) return;
     showToast('Menghapus...', 'info');
+
     if (typeof google !== 'undefined' && google.script && google.script.run) {
       google.script.run.withSuccessHandler(function(res) {
         if (res && res.success) {
           showToast(res.message, 'success');
           fetchFamilyData(currentFamilyNoKk);
           refreshData();
+        } else {
+          showToast(res ? res.message : 'Gagal menghapus.', 'error');
         }
       }).deleteAnggotaKeluarga(idAnggota);
     } else {
@@ -146,7 +455,12 @@
       }).getMadingList(params);
     } else {
       setTimeout(function() {
-        renderMadingCards([{ idMading: 'MAD-0001', judul: 'Kerja Bakti Bulanan RT 010', tanggalKegiatan: '10 September 2026', note: 'Diharapkan seluruh warga hadir membawa alat kebersihan.', statusPublish: 'Published', pembuat: 'Budi Santoso (Ketua RT)' }]);
+        renderMadingCards([
+          { idMading: 'MAD-0001', judul: 'Haul', tanggalKegiatan: '4 September 2026', note: 'haul', statusPublish: 'Published', pembuat: 'Komeng (Petugas Sampah)', createdAt: '04/09/2026 19:20:59' },
+          { idMading: 'MAD-0002', judul: 'Rapat Sampah', tanggalKegiatan: '7 September 2026', note: 'Nanti ada rapat mengenai sampah di balai warga.', statusPublish: 'Published', pembuat: 'Komeng (Petugas Sampah)', createdAt: '31/08/2026 16:30:36' },
+          { idMading: 'MAD-0003', judul: 'Rapat Pleno Warga & Pembahasan Kas', tanggalKegiatan: '25 September 2026', note: 'Pertemuan rutin bulanan bertempat di balai warga lantai 1 pukul 19:30 WIB.', statusPublish: 'Published', pembuat: 'Siti Rahmawati (Bendahara)', createdAt: '31/08/2026 16:29:04' },
+          { idMading: 'MAD-0004', judul: 'Kerja Bakti Bulanan RT 05', tanggalKegiatan: '10 September 2026', note: 'Diharapkan seluruh warga hadir membawa alat kebersihan masing-masing di pos ronda utama pukul 07:00 WIB.', statusPublish: 'Published', pembuat: 'Budi Santoso (Ketua RT)', createdAt: '31/08/2026 16:29:04' }
+        ]);
       }, 300);
     }
   }
@@ -159,12 +473,12 @@
       return;
     }
 
-    var isPengurus = currentUser && (currentUser.role === 'Super Admin' || currentUser.statusUser === 'Pengurus RT');
+    var isPengurus = currentUser && (currentUser.role === 'Super Admin' || currentUser.statusUser === 'Pengurus RT' || currentUser.role === 'Pengurus RT' || currentUser.role === 'Ketua RT' || currentUser.role === 'Bendahara' || currentUser.role === 'Sekretaris');
 
     for (var i = 0; i < list.length; i++) {
       var m = list[i];
       var card = document.createElement('div');
-      card.className = 'dashboard-card p-5 flex flex-col justify-between relative overflow-hidden';
+      card.className = 'dashboard-card p-5 flex flex-col justify-between relative overflow-hidden hover:shadow-md transition';
 
       var badgeStatus = m.statusPublish === 'Published' 
         ? '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">Published</span>' 
@@ -173,30 +487,65 @@
       var actionEditDelete = '';
       if (isPengurus) {
         actionEditDelete = 
-          '<div class="flex items-center gap-1.5 mt-4 pt-3 border-t border-slate-100">' +
-            '<button onclick="editMading(\'' + m.idMading + '\', \'' + encodeURIComponent(m.judul) + '\', \'' + encodeURIComponent(m.tanggalKegiatan) + '\', \'' + encodeURIComponent(m.note) + '\', \'' + m.statusPublish + '\')" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 transition"><i class="fa-solid fa-pen-to-square mr-1"></i>Edit</button>' +
-            '<button onclick="deleteMading(\'' + m.idMading + '\')" class="px-3 py-1.5 rounded-lg bg-rose-50 text-rose-600 font-bold text-xs hover:bg-rose-100 transition"><i class="fa-solid fa-trash mr-1"></i>Hapus</button>' +
+          '<div class="flex items-center gap-1.5 pt-2">' +
+            '<button onclick="editMading(\'' + m.idMading + '\', \'' + encodeURIComponent(m.judul) + '\', \'' + encodeURIComponent(m.tanggalKegiatan) + '\', \'' + encodeURIComponent(m.note) + '\', \'' + m.statusPublish + '\')" class="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 transition"><i class="fa-solid fa-pen-to-square mr-1"></i>Edit</button>' +
+            '<button onclick="deleteMading(\'' + m.idMading + '\')" class="px-3 py-1.5 rounded-xl bg-rose-50 text-rose-600 font-bold text-xs hover:bg-rose-100 transition"><i class="fa-solid fa-trash mr-1"></i>Hapus</button>' +
           '</div>';
       }
 
       card.innerHTML = 
         '<div>' +
           '<div class="flex items-center justify-between mb-2">' +
-            '<span class="text-[11px] font-bold text-brand-indigo bg-brand-lavender px-3 py-1 rounded-full"><i class="fa-solid fa-calendar-days mr-1.5"></i>' + m.tanggalKegiatan + '</span>' +
+            '<span class="text-[11px] font-bold text-sky-700 bg-sky-50 border border-sky-200 px-3 py-1 rounded-full"><i class="fa-solid fa-calendar-days mr-1.5 text-sky-500"></i>' + m.tanggalKegiatan + '</span>' +
             (isPengurus ? badgeStatus : '') +
           '</div>' +
-          '<h4 class="text-base font-bold text-slate-800 mt-2 mb-1">' + m.judul + '</h4>' +
-          '<p class="text-xs text-slate-600 leading-relaxed whitespace-pre-line mt-2">' + m.note + '</p>' +
+          '<h4 class="text-base font-bold text-slate-900 mt-2 mb-1">' + m.judul + '</h4>' +
+          '<p class="text-xs text-slate-600 leading-relaxed whitespace-pre-line mt-2 line-clamp-3">' + m.note + '</p>' +
+          '<div class="mt-3.5">' +
+            '<button type="button" onclick="openModalDetailMading(\'' + encodeURIComponent(m.judul) + '\', \'' + encodeURIComponent(m.tanggalKegiatan) + '\', \'' + encodeURIComponent(m.note) + '\', \'' + encodeURIComponent(m.pembuat) + '\', \'' + encodeURIComponent(m.createdAt || '') + '\')" class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-700 text-xs font-bold transition shadow-sm active:scale-95">' +
+              '<i class="fa-solid fa-book-open text-sky-500"></i>' +
+              '<span>Buka Pengumuman</span>' +
+            '</button>' +
+          '</div>' +
         '</div>' +
-        '<div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">' +
+        '<div class="mt-4 pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 text-[11px] text-slate-400">' +
           '<span><i class="fa-solid fa-user-pen mr-1"></i>Pembuat: <strong class="text-slate-700">' + m.pembuat + '</strong></span>' +
-          '<span>' + m.createdAt + '</span>' +
+          '<span>' + (m.createdAt || '') + '</span>' +
         '</div>' +
         actionEditDelete;
 
       container.appendChild(card);
     }
   }
+
+  function openModalDetailMading(judulEnc, tglEnc, noteEnc, pembuatEnc, createdEnc) {
+    try {
+      var judul = decodeURIComponent(judulEnc || '');
+      var tgl = decodeURIComponent(tglEnc || '');
+      var note = decodeURIComponent(noteEnc || '');
+      var pembuat = decodeURIComponent(pembuatEnc || '');
+      var created = decodeURIComponent(createdEnc || '');
+
+      var elJudul = document.getElementById('detailMadingJudul');
+      var elTgl = document.getElementById('detailMadingTgl');
+      var elNote = document.getElementById('detailMadingNote');
+      var elPembuat = document.getElementById('detailMadingPembuat');
+      var elCreated = document.getElementById('detailMadingCreatedAt');
+
+      if (elJudul) elJudul.innerText = judul || 'Pengumuman RT 010';
+      if (elTgl) elTgl.innerText = tgl || '-';
+      if (elNote) elNote.innerText = note || '-';
+      if (elPembuat) elPembuat.innerText = pembuat || 'Pengurus RT 010';
+      if (elCreated) elCreated.innerText = created || '';
+
+      var modal = document.getElementById('modalDetailMading');
+      if (modal) modal.classList.remove('hidden');
+    } catch (err) {
+      console.error('Gagal membuka detail mading:', err);
+    }
+  }
+  // Expose ke global window agar bisa dipanggil juga dari kartu dashboard
+  window.openModalDetailMading = openModalDetailMading;
 
   function openModalTambahMading() {
     document.getElementById('formMadingId').value = '';
