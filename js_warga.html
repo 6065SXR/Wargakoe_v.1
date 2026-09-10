@@ -1,28 +1,163 @@
 <script>
+  var debounceTimerWarga = null;
+  var currentWargaAlphabet = 'SEMUA';
+
   function debounceFetchWarga() {
     clearTimeout(debounceTimerWarga);
-    debounceTimerWarga = setTimeout(function() { fetchWargaData(0); }, 350);
+    debounceTimerWarga = setTimeout(function() { 
+      fetchWargaData(0); 
+    }, 350);
+  }
+
+  function setWargaAlphabet(char) {
+    currentWargaAlphabet = String(char || 'SEMUA').toUpperCase().trim();
+    
+    // Perbarui styling visual tombol abjad A-Z
+    var buttons = document.querySelectorAll('.warga-alpha-btn');
+    for (var b = 0; b < buttons.length; b++) {
+      var btn = buttons[b];
+      btn.className = 'warga-alpha-btn w-7 h-7 sm:w-8 sm:h-8 rounded-xl text-xs font-semibold transition-all bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 flex items-center justify-center shrink-0 cursor-pointer';
+    }
+
+    var allBtn = document.getElementById('wargaAlphaBtn_SEMUA');
+    if (allBtn) {
+      allBtn.className = 'warga-alpha-btn px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 shrink-0 cursor-pointer';
+    }
+
+    var activeBtn = document.getElementById('wargaAlphaBtn_' + currentWargaAlphabet);
+    if (activeBtn) {
+      if (currentWargaAlphabet === 'SEMUA') {
+        activeBtn.className = 'warga-alpha-btn px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-200 shrink-0 cursor-pointer';
+      } else {
+        activeBtn.className = 'warga-alpha-btn w-7 h-7 sm:w-8 sm:h-8 rounded-xl text-xs font-bold transition-all bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-200 flex items-center justify-center shrink-0 cursor-pointer';
+      }
+    }
+
+    fetchWargaData(0);
   }
 
   function fetchWargaData(offset) {
     offset = offset || 0;
-    var search = document.getElementById('filterWargaSearch').value;
-    var rumah = document.getElementById('filterWargaRumah').value;
-    var role = document.getElementById('filterWargaRole').value;
 
-    var params = { limit: 10, offset: offset, search: search, statusRumah: rumah, role: role };
+    var searchInput = document.getElementById('filterWargaSearch') || document.getElementById('searchWarga');
+    var search = searchInput ? searchInput.value.trim() : '';
+
+    var rumahSelect = document.getElementById('filterWargaRumah') || document.getElementById('filterWargaStatus');
+    var rumah = (rumahSelect && rumahSelect.value) ? rumahSelect.value : 'SEMUA';
+
+    var params = { 
+      limit: 10, 
+      offset: offset, 
+      search: search, 
+      statusRumah: rumah,
+      alphabet: currentWargaAlphabet
+    };
+
     var tbody = document.getElementById('wargaTableBody');
-    tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat...</td></tr>';
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400 font-medium">' +
+        '<i class="fa-solid fa-spinner fa-spin text-lg text-indigo-600 mr-2"></i>Memuat data warga...' +
+        '</td></tr>';
+    }
 
     if (typeof google !== 'undefined' && google.script && google.script.run) {
-      google.script.run.withSuccessHandler(function(res) {
-        if (res && res.success) renderWargaTable(res);
-      }).getWargaList(params);
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success) {
+            renderWargaTable(res);
+          } else {
+            if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-rose-500 font-medium">' + ((res && res.message) || 'Gagal memuat data warga.') + '</td></tr>';
+          }
+        })
+        .withFailureHandler(function(err) {
+          if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-rose-500 font-medium">Kesalahan server: ' + (err.message || err.toString()) + '</td></tr>';
+        })
+        .getWargaList(params);
     } else {
       setTimeout(function() {
+        var dummy = [
+          {
+            noKk: '3171010000000003',
+            nama: 'Agus Setiawan',
+            alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim',
+            jenisKelamin: 'Laki-laki',
+            umur: '29',
+            noHp: '081234567892',
+            jumlahKeluarga: 2,
+            anggotaKeluarga: [
+              { nama: 'Agus Setiawan', hubungan: 'Kepala Keluarga / Suami', jenisKelamin: 'Laki-laki', umur: '29' },
+              { nama: 'Dewi Lestari', hubungan: 'Istri', jenisKelamin: 'Perempuan', umur: '26' }
+            ]
+          },
+          {
+            noKk: '3171010000000001',
+            nama: 'Budi Santoso',
+            alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim',
+            jenisKelamin: 'Laki-laki',
+            umur: '39',
+            noHp: '081234567890',
+            jumlahKeluarga: 3,
+            anggotaKeluarga: [
+              { nama: 'Budi Santoso', hubungan: 'Kepala Keluarga / Suami', jenisKelamin: 'Laki-laki', umur: '39' },
+              { nama: 'Siti Rahmawati', hubungan: 'Istri', jenisKelamin: 'Perempuan', umur: '34' },
+              { nama: 'Rafi Pratama', hubungan: 'Anak', jenisKelamin: 'Laki-laki', umur: '10' }
+            ]
+          },
+          {
+            noKk: '3171010000000004',
+            nama: 'Haji Abdullah',
+            alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim',
+            jenisKelamin: 'Laki-laki',
+            umur: '64',
+            noHp: '081234567893',
+            jumlahKeluarga: 1,
+            anggotaKeluarga: [
+              { nama: 'Haji Abdullah', hubungan: 'Kepala Keluarga', jenisKelamin: 'Laki-laki', umur: '64' }
+            ]
+          },
+          {
+            noKk: '3171010000000002',
+            nama: 'Siti Rahmawati',
+            alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim',
+            jenisKelamin: 'Perempuan',
+            umur: '34',
+            noHp: '081234567891',
+            jumlahKeluarga: 3,
+            anggotaKeluarga: [
+              { nama: 'Budi Santoso', hubungan: 'Suami', jenisKelamin: 'Laki-laki', umur: '39' },
+              { nama: 'Siti Rahmawati', hubungan: 'Istri', jenisKelamin: 'Perempuan', umur: '34' },
+              { nama: 'Rafi Pratama', hubungan: 'Anak', jenisKelamin: 'Laki-laki', umur: '10' }
+            ]
+          },
+          {
+            noKk: '3171010000000005',
+            nama: 'Umar Wirahadi',
+            alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim',
+            jenisKelamin: 'Laki-laki',
+            umur: '37',
+            noHp: '081234567899',
+            jumlahKeluarga: 2,
+            anggotaKeluarga: [
+              { nama: 'Umar Wirahadi', hubungan: 'Kepala Keluarga', jenisKelamin: 'Laki-laki', umur: '37' },
+              { nama: 'Zubaedah', hubungan: 'Istri', jenisKelamin: 'Perempuan', umur: '35' }
+            ]
+          }
+        ];
+
+        // Demo sorting & filter
+        dummy.sort(function(a, b) { return a.nama.localeCompare(b.nama, 'id'); });
+        if (currentWargaAlphabet !== 'SEMUA') {
+          dummy = dummy.filter(function(w) { return w.nama.trim().toUpperCase().startsWith(currentWargaAlphabet); });
+        }
+        if (rumah !== 'SEMUA') {
+          dummy = dummy.filter(function(w) { return String(w.statusRumah || '').toLowerCase() === rumah.toLowerCase(); });
+        }
+
         renderWargaTable({
-          data: [{ noKk: '3171010000000001', noKtp: '3171010101850001', nama: 'Budi Santoso', noHp: '081234567890', alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim', statusRumah: 'Pribadi', pekerjaan: 'Pegawai Negeri', role: 'Super Admin', statusUser: 'Pengurus RT' }],
-          total: 1, page: 1, totalPages: 1
+          data: dummy,
+          total: dummy.length,
+          page: 1,
+          totalPages: 1
         });
       }, 300);
     }
@@ -30,43 +165,194 @@
 
   function renderWargaTable(res) {
     var tbody = document.getElementById('wargaTableBody');
+    if (!tbody) return;
     tbody.innerHTML = '';
-    if (!res.data || res.data.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-slate-400">Tidak ada data.</td></tr>';
-      document.getElementById('wargaPaginationInfo').innerText = 'Menampilkan 0 data';
-      document.getElementById('wargaPaginationBtns').innerHTML = '';
+
+    if (!res || !res.data || res.data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400 font-medium"><i class="fa-solid fa-users-slash text-2xl mb-2 block text-slate-300"></i>Tidak ada data warga ditemukan.</td></tr>';
+      var pInfo = document.getElementById('wargaPaginationInfo');
+      if (pInfo) pInfo.innerText = 'Menampilkan 0 data warga';
+      var pBtns = document.getElementById('wargaPaginationBtns');
+      if (pBtns) pBtns.innerHTML = '';
       return;
     }
 
     for (var i = 0; i < res.data.length; i++) {
       var w = res.data[i];
       var tr = document.createElement('tr');
-      tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+      tr.className = 'hover:bg-slate-50 transition border-b border-slate-100 text-xs sm:text-sm';
 
-      tr.innerHTML = 
-        '<td class="p-3.5"><p class="font-bold text-slate-800">' + w.nama + '</p><p class="text-[10px] text-slate-400 font-mono">KK: ' + w.noKk + '</p></td>' +
-        '<td class="p-3.5 text-slate-700 font-medium"><i class="fa-solid fa-phone mr-1.5 text-slate-400"></i>' + w.noHp + '</td>' +
-        '<td class="p-3.5 text-slate-600">' + (w.alamat || '-') + '</td>' +
-        '<td class="p-3.5"><span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">' + w.statusRumah + '</span></td>' +
-        '<td class="p-3.5 font-medium text-slate-700">' + w.pekerjaan + '</td>';
+      // 1. NAMA: Hanya nama lengkap saja (No. KK & NIK disembunyikan total)
+      var colNama = '<td class="p-3.5 align-middle">' +
+        '<p class="font-bold text-slate-900 text-sm leading-snug">' + (w.nama || '-') + '</p>' +
+      '</td>';
+
+      // 2. ALAMAT
+      var colAlamat = '<td class="p-3.5 align-middle text-slate-600 max-w-[240px] leading-relaxed">' + (w.alamat || '-') + '</td>';
+
+      // 3. TEMPAT TINGGAL (STATUS RUMAH)
+      var stRumah = String(w.statusRumah || 'Pribadi').trim();
+      var isKontrak = stRumah.toLowerCase() === 'kontrak';
+      var colTempatTinggal = '<td class="p-3.5 align-middle">' +
+        '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ' + 
+          (isKontrak ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200') + '">' +
+          '<i class="fa-solid ' + (isKontrak ? 'fa-key' : 'fa-house-chimney') + ' text-[10px]"></i>' +
+          '<span>' + (isKontrak ? 'Rumah Kontrak' : 'Rumah Pribadi') + '</span>' +
+        '</span>' +
+      '</td>';
+
+      // 4. UMUR
+      var umurTxt = (w.umur && w.umur !== '-') ? (w.umur + ' Tahun') : '-';
+      var colUmur = '<td class="p-3.5 align-middle font-bold text-slate-800">' + umurTxt + '</td>';
+
+      // 5. NOMOR CONTACT (DIRECT WHATSAPP)
+      var rawHp = String(w.noHp || '').trim();
+      var cleanHp = rawHp.replace(/[^0-9]/g, '');
+      if (cleanHp.startsWith('0')) cleanHp = '62' + cleanHp.substring(1);
+      var waUrl = cleanHp ? ('https://wa.me/' + cleanHp) : '';
+
+      var colHp = '<td class="p-3.5 align-middle font-mono text-xs">' +
+        (rawHp && rawHp !== '-' && waUrl
+          ? '<a href="' + waUrl + '" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold border border-emerald-200 transition active:scale-95 shadow-sm" title="Chat WhatsApp">' +
+              '<i class="fa-brands fa-whatsapp text-sm text-emerald-600"></i>' +
+              '<span>' + rawHp + '</span>' +
+            '</a>'
+          : '<span class="text-slate-400">-</span>') +
+      '</td>';
+
+      // 6. AKSI: Dropdown Toggle Anggota Keluarga dalam 1 No. KK
+      var totJiwa = w.jumlahKeluarga || (w.anggotaKeluarga ? w.anggotaKeluarga.length : 1);
+      var expandId = 'keluargaExpandRow_' + i;
+      var btnId = 'keluargaBtn_' + i;
+
+      var colAksi = '<td class="p-3.5 align-middle text-center">' +
+        '<button type="button" id="' + btnId + '" onclick="toggleKeluargaDropdown(\'' + expandId + '\', \'' + btnId + '\')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-xs transition active:scale-95 shadow-sm cursor-pointer" title="Buka susunan anggota keluarga">' +
+          '<i class="fa-solid fa-people-roof text-xs text-indigo-600"></i>' +
+          '<span>' + totJiwa + ' Jiwa</span>' +
+          '<i id="' + btnId + '_icon" class="fa-solid fa-chevron-down text-[9px] ml-0.5 transition-transform duration-200"></i>' +
+        '</button>' +
+      '</td>';
+
+      tr.innerHTML = colNama + colAlamat + colTempatTinggal + colUmur + colHp + colAksi;
       tbody.appendChild(tr);
+
+      // SUB-ROW DROPDOWN: Susunan seluruh anggota keluarga dalam 1 No. KK
+      var expandTr = document.createElement('tr');
+      expandTr.id = expandId;
+      expandTr.className = 'hidden bg-slate-50/90 border-b border-indigo-100/70 transition-all';
+
+      var members = w.anggotaKeluarga || [];
+      var membersHtml = '';
+
+      if (!members || members.length === 0) {
+        membersHtml = 
+          '<div class="p-4 text-center text-xs text-slate-400 italic">' +
+            '<i class="fa-solid fa-circle-info mr-1"></i>Belum ada data anggota keluarga lain yang terdaftar dalam No. KK ini.' +
+          '</div>';
+      } else {
+        membersHtml = 
+          '<div class="p-3.5 sm:p-4 bg-white/95 rounded-2xl border border-indigo-100/90 shadow-sm m-2 sm:m-3 space-y-2.5">' +
+            '<div class="flex items-center justify-between pb-2 border-b border-slate-100">' +
+              '<div class="flex items-center gap-2">' +
+                '<div class="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold">' +
+                  '<i class="fa-solid fa-house-chimney-user"></i>' +
+                '</div>' +
+                '<h5 class="text-xs font-bold text-slate-800">Susunan Anggota Keluarga (Total ' + members.length + ' Jiwa)</h5>' +
+              '</div>' +
+              '<span class="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100">' +
+                'Keluarga ' + (w.nama || '') +
+              '</span>' +
+            '</div>' +
+            '<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">';
+
+        for (var m = 0; m < members.length; m++) {
+          var mem = members[m];
+          var memIsPerempuan = String(mem.jenisKelamin || '').toLowerCase().trim() === 'perempuan';
+          var memHubungan = mem.hubungan || 'Anggota Keluarga';
+          var memUmur = (mem.umur && mem.umur !== '-') ? (mem.umur + ' Thn') : '-';
+
+          membersHtml += 
+            '<div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-2 hover:bg-white hover:border-indigo-200 transition shadow-2xs">' +
+              '<div class="min-w-0">' +
+                '<p class="text-xs font-bold text-slate-800 truncate">' + (mem.nama || '-') + '</p>' +
+                '<span class="inline-flex items-center gap-1 text-[10px] font-semibold text-indigo-600 mt-0.5">' +
+                  '<i class="fa-solid fa-user-tag text-[9px]"></i>' + memHubungan +
+                '</span>' +
+              '</div>' +
+              '<div class="text-right shrink-0">' +
+                '<span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[9px] font-bold ' + (memIsPerempuan ? 'bg-pink-50 text-pink-700 border border-pink-200' : 'bg-sky-50 text-sky-700 border border-sky-200') + '">' +
+                  '<i class="fa-solid ' + (memIsPerempuan ? 'fa-venus' : 'fa-mars') + ' text-[8px]"></i>' + (mem.jenisKelamin || '-') +
+                '</span>' +
+                '<p class="text-[10px] font-bold text-slate-700 mt-0.5">' + memUmur + '</p>' +
+              '</div>' +
+            '</div>';
+        }
+
+        membersHtml += '</div></div>';
+      }
+
+      expandTr.innerHTML = '<td colspan="6" class="p-0">' + membersHtml + '</td>';
+      tbody.appendChild(expandTr);
     }
-    document.getElementById('wargaPaginationInfo').innerText = 'Halaman ' + res.page + ' dari ' + res.totalPages;
-    renderPaginationButtons('wargaPaginationBtns', res.page, res.totalPages, 'fetchWargaData');
+
+    var pInfo = document.getElementById('wargaPaginationInfo');
+    if (pInfo) {
+      var filterLabel = currentWargaAlphabet !== 'SEMUA' ? (' (Awalan Huruf "' + currentWargaAlphabet + '")') : '';
+      pInfo.innerText = 'Halaman ' + (res.page || 1) + ' dari ' + (res.totalPages || 1) + ' (Total ' + (res.total || res.data.length) + ' Warga' + filterLabel + ')';
+    }
+
+    if (typeof renderPaginationButtons === 'function') {
+      renderPaginationButtons('wargaPaginationBtns', res.page || 1, res.totalPages || 1, 'fetchWargaData');
+    }
+  }
+
+  function toggleKeluargaDropdown(expandId, btnId) {
+    var expandRow = document.getElementById(expandId);
+    var icon = document.getElementById(btnId + '_icon');
+    var btn = document.getElementById(btnId);
+    if (!expandRow) return;
+
+    if (expandRow.classList.contains('hidden')) {
+      expandRow.classList.remove('hidden');
+      if (icon) icon.className = 'fa-solid fa-chevron-up text-[9px] ml-0.5 transition-transform duration-200';
+      if (btn) {
+        btn.classList.add('bg-indigo-100', 'ring-2', 'ring-indigo-300');
+        btn.classList.remove('bg-indigo-50');
+      }
+    } else {
+      expandRow.classList.add('hidden');
+      if (icon) icon.className = 'fa-solid fa-chevron-down text-[9px] ml-0.5 transition-transform duration-200';
+      if (btn) {
+        btn.classList.remove('bg-indigo-100', 'ring-2', 'ring-indigo-300');
+        btn.classList.add('bg-indigo-50');
+      }
+    }
   }
 
   function exportWargaCSV() {
-    showToast('Menyiapkan export...', 'info');
+    if (typeof showToast === 'function') showToast('Menyiapkan berkas ekspor data warga...', 'info');
+
     if (typeof google !== 'undefined' && google.script && google.script.run) {
-      google.script.run.withSuccessHandler(function(res) {
-        if (res && res.success && res.data) {
-          triggerCSVDownload(res.data, 'Data_Warga_RT010.csv');
-          showToast('Export berhasil.', 'success');
-        }
-      }).getAllWargaForExport();
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success && res.data && res.data.length > 0) {
+            triggerCSVDownload(res.data, 'Data_Warga_RT010.csv');
+            if (typeof showToast === 'function') showToast('Data warga berhasil diunduh (CSV).', 'success');
+          } else {
+            if (typeof showToast === 'function') showToast('Tidak ada data warga untuk diekspor.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          if (typeof showToast === 'function') showToast('Gagal ekspor: ' + err.toString(), 'error');
+        })
+        .getAllWargaForExport();
     } else {
       setTimeout(function() {
-        triggerCSVDownload([{ noKk: '3171010000000001', nama: 'Budi Santoso', noHp: '081234567890' }], 'Data_Warga_Demo.csv');
+        var dummy = [
+          { No_KK: '3171010000000001', No_KTP: '3171010101850001', Nama: 'Budi Santoso', No_HP: '081234567890', Role: 'Super Admin', Status_User: 'Pengurus RT', Tanggal_Lahir: '15/01/1985', Umur: '39', Alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim', Jenis_Kelamin: 'Laki-laki', Status_Keluarga: 'Suami', Status_Rumah: 'Pribadi', Pendidikan: 'Sarjana', Pekerjaan: 'Pegawai Negeri' }
+        ];
+        triggerCSVDownload(dummy, 'Data_Warga_RT010_Demo.csv');
+        if (typeof showToast === 'function') showToast('Data warga berhasil diunduh (Mode Demo).', 'success');
       }, 400);
     }
   }
@@ -79,13 +365,13 @@
     for (var i = 0; i < dataArray.length; i++) {
       var values = [];
       for (var h = 0; h < headers.length; h++) {
-        var val = String(dataArray[i][headers[h]] || '').replace(/"/g, '""');
+        var val = String(dataArray[i][headers[h]] !== undefined ? dataArray[i][headers[h]] : '').replace(/"/g, '""');
         values.push('"' + val + '"');
       }
       csvRows.push(values.join(','));
     }
 
-    var blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    var blob = new Blob([csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
     var link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = filename;
@@ -95,57 +381,112 @@
   }
 
   function downloadWargaTemplateCSV() {
-    var template = [{ No_KK: '3171010000000099', No_KTP: '3171010101850099', Nama: 'Warga Contoh', No_HP: '081299998888', Password: 'warga123', Role: 'Warga', Status_User: 'Warga', Tanggal_Lahir: '10/10/1990', Umur: '34', Alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim', Jenis_Kelamin: 'Laki-laki', Status_Keluarga: 'Suami', Status_Rumah: 'Pribadi', Pendidikan: 'SMA', Pekerjaan: 'Pegawai Swasta' }];
-    triggerCSVDownload(template, 'Template_Import_Warga.csv');
+    var template = [{
+      No_KK: '3171010000000099',
+      No_KTP: '3171010101900099',
+      Nama: 'Warga Contoh Baru',
+      No_HP: '081299998888',
+      Password: 'warga123',
+      Role: 'Warga',
+      Status_User: 'Warga',
+      Tanggal_Lahir: '15/01/1990',
+      Umur: '34',
+      Alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim',
+      Jenis_Kelamin: 'Laki-laki',
+      Status_Keluarga: 'Kepala Keluarga',
+      Status_Rumah: 'Pribadi',
+      Pendidikan: 'Sarjana',
+      Pekerjaan: 'Karyawan Swasta'
+    }];
+    triggerCSVDownload(template, 'Template_Import_Warga_RT010.csv');
+    if (typeof showToast === 'function') showToast('Template CSV berhasil diunduh.', 'success');
   }
 
   function openModalImportWarga() {
-    document.getElementById('importFileCsv').value = '';
+    var isPengurus = currentUser && (
+      currentUser.role === 'Super Admin' ||
+      currentUser.statusUser === 'Pengurus RT' ||
+      currentUser.role === 'Pengurus RT' ||
+      currentUser.role === 'Ketua RT' ||
+      currentUser.role === 'Bendahara' ||
+      currentUser.role === 'Sekretaris'
+    );
+
+    if (!isPengurus) {
+      if (typeof showToast === 'function') showToast('Akses ditolak! Fitur import CSV khusus untuk Pengurus RT.', 'error');
+      return;
+    }
+
+    var fileInput = document.getElementById('importFileCsv');
+    if (fileInput) fileInput.value = '';
     var notice = document.getElementById('importResultNotice');
-    notice.className = 'hidden';
-    notice.innerHTML = '';
-    document.getElementById('modalImportWarga').classList.remove('hidden');
+    if (notice) {
+      notice.className = 'hidden';
+      notice.innerHTML = '';
+    }
+    var modal = document.getElementById('modalImportWarga');
+    if (modal) modal.classList.remove('hidden');
   }
 
   function processImportWarga() {
     var fileInput = document.getElementById('importFileCsv');
-    if (!fileInput.files || fileInput.files.length === 0) {
-      showToast('Pilih file CSV terlebih dahulu!', 'error');
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+      if (typeof showToast === 'function') showToast('Pilih berkas CSV terlebih dahulu!', 'error');
       return;
     }
 
     var file = fileInput.files[0];
     var reader = new FileReader();
     var btn = document.getElementById('btnProsesImport');
-    btn.disabled = true;
-    btn.innerText = 'Memproses...';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Memproses Import...';
+    }
 
     reader.onload = function(e) {
       var text = e.target.result;
       var parsedData = parseCSVToWargaList(text);
 
       if (parsedData.length === 0) {
-        btn.disabled = false;
-        btn.innerText = 'Mulai Import';
-        showToast('File CSV kosong.', 'error');
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-file-import mr-1"></i>Mulai Import Data';
+        }
+        if (typeof showToast === 'function') showToast('File CSV kosong atau kolom tidak sesuai template.', 'error');
         return;
       }
 
       if (typeof google !== 'undefined' && google.script && google.script.run) {
-        google.script.run.withSuccessHandler(function(res) {
-          btn.disabled = false;
-          btn.innerText = 'Mulai Import';
-          if (res && res.success) {
-            renderImportResult(res);
-            fetchWargaData(0);
-            refreshData();
-          }
-        }).importWargaBatch(parsedData);
+        google.script.run
+          .withSuccessHandler(function(res) {
+            if (btn) {
+              btn.disabled = false;
+              btn.innerHTML = '<i class="fa-solid fa-file-import mr-1"></i>Mulai Import Data';
+            }
+            if (res && res.success) {
+              renderImportResult(res);
+              fetchWargaData(0);
+              if (typeof refreshData === 'function') refreshData();
+            } else {
+              if (typeof showToast === 'function') showToast(res ? res.message : 'Gagal import warga.', 'error');
+            }
+          })
+          .withFailureHandler(function(err) {
+            if (btn) {
+              btn.disabled = false;
+              btn.innerHTML = '<i class="fa-solid fa-file-import mr-1"></i>Mulai Import Data';
+            }
+            if (typeof showToast === 'function') showToast('Kesalahan server: ' + err.toString(), 'error');
+          })
+          .importWargaBatch(parsedData);
       } else {
         setTimeout(function() {
-          btn.disabled = false;
-          btn.innerText = 'Mulai Import';
-          renderImportResult({ success: true, importedCount: parsedData.length, duplicates: [], message: 'Import selesai.' });
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-file-import mr-1"></i>Mulai Import Data';
+          }
+          renderImportResult({ success: true, importedCount: parsedData.length, duplicates: [], message: 'Berhasil mengimpor ' + parsedData.length + ' data warga (Demo Mode).' });
+          fetchWargaData(0);
         }, 500);
       }
     };
@@ -157,30 +498,47 @@
     if (lines.length <= 1) return [];
     var headers = lines[0].split(',').map(function(h) { return h.replace(/"/g, '').trim(); });
     var list = [];
+
     for (var i = 1; i < lines.length; i++) {
       var line = lines[i].trim();
       if (!line) continue;
       var cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(function(c) { return c.replace(/"/g, '').trim(); });
       var rowObj = {};
-      for (var h = 0; h < headers.length; h++) rowObj[headers[h]] = cols[h] || '';
-      if (rowObj['No_KK'] || rowObj['noKk']) list.push(rowObj);
+      for (var h = 0; h < headers.length; h++) {
+        rowObj[headers[h]] = cols[h] || '';
+      }
+      if (rowObj['No_KK'] || rowObj['noKk'] || rowObj['Nama'] || rowObj['nama']) {
+        list.push(rowObj);
+      }
     }
     return list;
   }
 
   function renderImportResult(res) {
     var notice = document.getElementById('importResultNotice');
+    if (!notice) return;
     notice.classList.remove('hidden');
+
     var html = '<p class="font-bold text-slate-800 mb-1">' + res.message + '</p>';
     if (res.duplicates && res.duplicates.length > 0) {
-      notice.className = 'p-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs leading-relaxed max-h-40 overflow-y-auto';
-      html += '<p class="font-bold text-red-600 mt-2 mb-1">Duplikat Dilewati (' + res.duplicates.length + '):</p><ul class="list-disc pl-4 space-y-0.5 text-[11px] text-red-700">';
-      for (var i = 0; i < res.duplicates.length; i++) html += '<li>' + res.duplicates[i] + '</li>';
+      notice.className = 'p-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs leading-relaxed max-h-44 overflow-y-auto';
+      html += '<p class="font-bold text-rose-700 mt-2 mb-1">Dilewati karena NIK sudah terdaftar (' + res.duplicates.length + '):</p><ul class="list-disc pl-4 space-y-0.5 text-[11px] text-rose-800">';
+      for (var i = 0; i < res.duplicates.length; i++) {
+        html += '<li>' + res.duplicates[i] + '</li>';
+      }
       html += '</ul>';
     } else {
       notice.className = 'p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs leading-relaxed';
-      html += '<p class="text-emerald-700 mt-1"><i class="fa-solid fa-circle-check mr-1"></i>Seluruh data CSV diimpor.</p>';
+      html += '<p class="text-emerald-700 mt-1"><i class="fa-solid fa-circle-check mr-1"></i>Seluruh data warga baru berhasil dimasukkan ke sheet USERS.</p>';
     }
     notice.innerHTML = html;
   }
+
+  // Kompatibilitas fungsi panggilan router tab
+  window.loadWargaData = function() { fetchWargaData(0); };
+  window.loadDataWarga = function() { fetchWargaData(0); };
+  window.exportWargaToCsv = exportWargaCSV;
+  window.fetchWargaData = fetchWargaData;
+  window.setWargaAlphabet = setWargaAlphabet;
+  window.toggleKeluargaDropdown = toggleKeluargaDropdown;
 </script>
