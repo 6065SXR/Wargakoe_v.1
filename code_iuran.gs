@@ -1,30 +1,121 @@
 /**
  * ====================================================================
- * WARGAKOE - IURAN & KAS RT BACKEND MODULE (CASHFLOW & 3-IN-1 ENGINE)
- * Mengelola pembukuan Kas RT, verifikasi pembayaran iuran warga,
- * Dompet 4 Pos Terpisah, Monitoring Kepatuhan KK, & Buku Belanja RT.
+ * WARGAKOE - IURAN & KAS RT BACKEND MODULE (CASHFLOW & DOMPET 4 POS)
+ * Menghitung Saldo Awal Mengendap (Bulan Lalu), Arus Kas Masuk & Keluar
+ * Bulan Berjalan, serta Total Sisa Saldo Akhir per masing-masing pos.
  * ====================================================================
  */
 
 function getKasRtDetails(targetBulan, targetTahun) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var curBulan = String(targetBulan || 'September').trim();
-    var curTahun = String(targetTahun || '2026').trim();
 
-    // 1. DOMPET 4 POS TERPISAH & BUKU BELANJA (DARI SHEET KAS_RT)
+    // Daftar bulan dalam bahasa Indonesia untuk pemetaan periode kronologis
+    var ID_MONTHS = ['januari', 'februari', 'maret', 'april', 'mei', 'juni', 'juli', 'agustus', 'september', 'oktober', 'november', 'desember'];
+
+    // Menentukan index periode aktif yang sedang dilihat
+    var tBulanLower = String(targetBulan || 'September').toLowerCase().trim();
+    var tMonthIdx = ID_MONTHS.indexOf(tBulanLower);
+    if (tMonthIdx === -1) tMonthIdx = 8; // Default September (0-indexed)
+    var tYear = parseInt(targetTahun, 10) || 2026;
+    var targetPeriodVal = (tYear * 12) + tMonthIdx;
+
+    // Helper untuk mengekstrak nilai periode (Year * 12 + MonthIdx) dari string
+    function extractPeriodVal_(blnStr, tglStr, crtStr) {
+      blnStr = String(blnStr || '').toLowerCase().trim();
+      for (var m = 0; m < ID_MONTHS.length; m++) {
+        if (blnStr.indexOf(ID_MONTHS[m]) !== -1) {
+          var yMatch = blnStr.match(/20\d\d/);
+          var yr = yMatch ? parseInt(yMatch[0], 10) : tYear;
+          return (yr * 12) + m;
+        }
+      }
+      var dateCandidate = tglStr || crtStr || '';
+      if (dateCandidate) {
+        if (dateCandidate.indexOf('/') !== -1) {
+          var p = dateCandidate.split('/');
+          if (p.length >= 3) {
+            var mNum = parseInt(p[1], 10) - 1;
+            var yNum = parseInt(p[2].substring(0, 4), 10);
+            if (!isNaN(mNum) && !isNaN(yNum)) return (yNum * 12) + mNum;
+          }
+        } else if (dateCandidate.indexOf('-') !== -1) {
+          var p2 = dateCandidate.split('-');
+          if (p2.length >= 3) {
+            var yNum2 = parseInt(p2[0], 10);
+            var mNum2 = parseInt(p2[1], 10) - 1;
+            if (!isNaN(mNum2) && !isNaN(yNum2)) return (yNum2 * 12) + mNum2;
+          }
+        }
+      }
+      return targetPeriodVal; // Fallback jika tidak terdeteksi
+    }
+
+    // Inisialisasi Dompet 4 Pos Terpisah secara independen
     var dompet = {
-      kasRt: { masuk: 0, keluar: 0, saldo: 0 },
-      kasDuka: { masuk: 0, keluar: 0, saldo: 0 },
-      kasSampah: { masuk: 0, keluar: 0, saldo: 0 },
-      kasSosial: { masuk: 0, keluar: 0, saldo: 0 }
+      kasRt: { saldoAwal: 0, masuk: 0, keluar: 0, arusBulanIni: 0, saldo: 0 },
+      kasDuka: { saldoAwal: 0, masuk: 0, keluar: 0, arusBulanIni: 0, saldo: 0 },
+      kasSampah: { saldoAwal: 0, masuk: 0, keluar: 0, arusBulanIni: 0, saldo: 0 },
+      kasSosial: { saldoAwal: 0, masuk: 0, keluar: 0, arusBulanIni: 0, saldo: 0 }
     };
 
     var pengeluaranList = [];
-    var totalPemasukanAll = 0;
-    var totalPengeluaranAll = 0;
 
-    var kasSheet = getKasSheetSafe_(ss);
+    // 1. HITUNG UANG MASUK DARI SHEET IURAN (TERPISAH SEBELUM BULAN INI VS BULAN INI)
+    var iurSheet = getSheetByNameFlexible_(ss, 'IURAN');
+    if (iurSheet && iurSheet.getLastRow() > 1) {
+      var iData = iurSheet.getDataRange().getDisplayValues();
+      var iHeaders = iData[0];
+
+      var iBulanIdx = findColIdxFlexible_(iHeaders, ['bulan_tahun', 'bulantahun', 'periode', 'bulan'], 4);
+      var iJenisIdx = findColIdxFlexible_(iHeaders, ['jenis_iuran', 'jenisiuran', 'jenis'], 5);
+      var iNomIdx = findColIdxFlexible_(iHeaders, ['nominal', 'jumlah', 'total', 'rp'], 6);
+      var iStatusIdx = findColIdxFlexible_(iHeaders, ['status_bayar', 'statusbayar', 'status'], 7);
+      var iTglIdx = findColIdxFlexible_(iHeaders, ['tanggal_bayar', 'tanggal', 'tgl'], 8);
+      var iCrtIdx = findColIdxFlexible_(iHeaders, ['created_at', 'createdat', 'timestamp'], 10);
+
+      for (var j = 1; j < iData.length; j++) {
+        var rowIur = iData[j];
+        if (!rowIur || rowIur.length === 0) continue;
+
+        var status = String(iStatusIdx !== -1 ? rowIur[iStatusIdx] : '').toLowerCase().trim();
+        var isPaid = (status === 'sudah bayar' || status === 'lunas' || status === 'approved' || status === 'sukses');
+
+        if (isPaid) {
+          var nominal = parseKasNominalSafe_(iNomIdx !== -1 ? rowIur[iNomIdx] : 0);
+          var jenis = String(iJenisIdx !== -1 ? rowIur[iJenisIdx] : '').toLowerCase().trim();
+          var blnStr = iBulanIdx !== -1 ? rowIur[iBulanIdx] : '';
+          var tglStr = iTglIdx !== -1 ? rowIur[iTglIdx] : '';
+          var crtStr = iCrtIdx !== -1 ? rowIur[iCrtIdx] : '';
+
+          var rowPeriodVal = extractPeriodVal_(blnStr, tglStr, crtStr);
+          var pocketKey = null;
+
+          if (jenis.indexOf('duka') !== -1 || jenis.indexOf('kematian') !== -1) {
+            pocketKey = 'kasDuka';
+          } else if (jenis.indexOf('sampah') !== -1 || jenis.indexOf('kebersihan') !== -1) {
+            pocketKey = 'kasSampah';
+          } else if (jenis.indexOf('sosial') !== -1) {
+            pocketKey = 'kasSosial';
+          } else if (jenis.indexOf('kas') !== -1 || jenis === 'iuran kas' || jenis === 'kas rt') {
+            pocketKey = 'kasRt';
+          }
+
+          if (pocketKey && dompet[pocketKey]) {
+            if (rowPeriodVal < targetPeriodVal) {
+              // Uang masuk dari bulan-bulan sebelum bulan aktif -> mengendap di Saldo Awal
+              dompet[pocketKey].saldoAwal += nominal;
+            } else {
+              // Uang masuk pada bulan aktif berjalan
+              dompet[pocketKey].masuk += nominal;
+            }
+          }
+        }
+      }
+    }
+
+    // 2. HITUNG UANG KELUAR DARI SHEET KAS_RT (TERPISAH SEBELUM BULAN INI VS BULAN INI)
+    var kasSheet = getSheetByNameFlexible_(ss, 'KAS_RT');
     if (kasSheet && kasSheet.getLastRow() > 1) {
       var rawData = kasSheet.getDataRange().getDisplayValues();
       var headers = rawData[0];
@@ -38,7 +129,7 @@ function getKasRtDetails(targetBulan, targetTahun) {
       var bulanTahunIdx = findColIdxFlexible_(headers, ['bulan_tahun', 'bulantahun', 'periode', 'bulan'], 6);
       var createdIdx = findColIdxFlexible_(headers, ['created_at', 'createdat', 'timestamp'], 7);
 
-      for (var i = rawData.length - 1; i >= 1; i--) {
+      for (var i = 1; i < rawData.length; i++) {
         var row = rawData[i];
         if (!row || row.length === 0) continue;
 
@@ -51,29 +142,56 @@ function getKasRtDetails(targetBulan, targetTahun) {
         var colBulan = String(bulanTahunIdx !== -1 && row[bulanTahunIdx] ? row[bulanTahunIdx] : '').trim();
         var colCreated = String(createdIdx !== -1 && row[createdIdx] ? row[createdIdx] : '').trim();
 
-        var isMasuk = (colJenis.indexOf('masuk') !== -1 || colJenis.indexOf('terima') !== -1);
-        var isKeluar = (colJenis.indexOf('keluar') !== -1 || colJenis.indexOf('belanja') !== -1 || colJenis.indexOf('biaya') !== -1);
+        var isKeluar = (
+          colJenis === 'pengeluaran' ||
+          colJenis.indexOf('pengeluaran') !== -1 ||
+          colJenis.indexOf('keluar') !== -1 ||
+          colJenis.indexOf('belanja') !== -1 ||
+          colJenis.indexOf('biaya') !== -1
+        );
 
-        var pocketKey = 'kasRt';
-        var katLower = colKat.toLowerCase();
-
-        if (katLower.indexOf('duka') !== -1 || katLower.indexOf('kematian') !== -1) {
-          pocketKey = 'kasDuka';
-        } else if (katLower.indexOf('sampah') !== -1) {
-          pocketKey = 'kasSampah';
-        } else if (katLower.indexOf('sosial') !== -1) {
-          pocketKey = 'kasSosial';
-        } else {
-          pocketKey = 'kasRt';
+        if (!isKeluar && colJenis.indexOf('masuk') === -1 && colJenis.indexOf('terima') === -1 && colNom > 0) {
+          isKeluar = true;
         }
 
-        if (isMasuk) {
-          dompet[pocketKey].masuk += colNom;
-          totalPemasukanAll += colNom;
-        } else if (isKeluar) {
-          dompet[pocketKey].keluar += colNom;
-          totalPengeluaranAll += colNom;
+        if (isKeluar) {
+          var katLower = colKat.toLowerCase();
+          var pKey = null;
 
+          if (katLower.indexOf('duka') !== -1 || katLower.indexOf('kematian') !== -1) {
+            pKey = 'kasDuka';
+          } else if (katLower.indexOf('sampah') !== -1 || katLower.indexOf('kebersihan') !== -1) {
+            pKey = 'kasSampah';
+          } else if (katLower.indexOf('sosial') !== -1) {
+            pKey = 'kasSosial';
+          } else if (
+            katLower === 'iuran kas' ||
+            katLower === 'kas rt' ||
+            katLower === 'kas' ||
+            (katLower.indexOf('kas') !== -1 &&
+             katLower.indexOf('duka') === -1 &&
+             katLower.indexOf('kematian') === -1 &&
+             katLower.indexOf('sampah') === -1 &&
+             katLower.indexOf('sosial') === -1 &&
+             katLower.indexOf('kebersihan') === -1 &&
+             katLower.indexOf('fasilitas') === -1)
+          ) {
+            pKey = 'kasRt';
+          }
+
+          var rowPerValKas = extractPeriodVal_(colBulan, colTgl, colCreated);
+
+          if (pKey && dompet[pKey]) {
+            if (rowPerValKas < targetPeriodVal) {
+              // Pengeluaran dari bulan sebelum bulan aktif -> memotong Saldo Awal
+              dompet[pKey].saldoAwal -= colNom;
+            } else {
+              // Pengeluaran pada bulan aktif berjalan
+              dompet[pKey].keluar += colNom;
+            }
+          }
+
+          // Catatan pengeluaran masuk ke Buku Transparansi
           pengeluaranList.push({
             idKas: colId,
             tanggal: colTgl !== '-' ? colTgl : (colCreated ? colCreated.split(' ')[0] : '-'),
@@ -84,99 +202,26 @@ function getKasRtDetails(targetBulan, targetTahun) {
           });
         }
       }
-
-      dompet.kasRt.saldo = dompet.kasRt.masuk - dompet.kasRt.keluar;
-      dompet.kasDuka.saldo = dompet.kasDuka.masuk - dompet.kasDuka.keluar;
-      dompet.kasSampah.saldo = dompet.kasSampah.masuk - dompet.kasSampah.keluar;
-      dompet.kasSosial.saldo = dompet.kasSosial.masuk - dompet.kasSosial.keluar;
     }
 
-    // 2. MONITORING KEPATUHAN KEPALA KELUARGA (USERS + IURAN)
-    var totalKk = 0;
-    var lunasKk = 0;
-    var kkMap = {};
-
-    var userSheet = ss.getSheetByName('USERS') || ss.getSheetByName('Users') || ss.getSheetByName('users');
-    if (userSheet && userSheet.getLastRow() > 1) {
-      var uData = userSheet.getDataRange().getDisplayValues();
-      var uHeaders = uData[0];
-      var uKkIdx = findColIdxFlexible_(uHeaders, ['no_kk', 'nokk', 'no kk', 'kk'], 0);
-      var uNamaIdx = findColIdxFlexible_(uHeaders, ['nama', 'nama_lengkap', 'namawarga'], 2);
-      var uHpIdx = findColIdxFlexible_(uHeaders, ['no_hp', 'nohp', 'hp', 'telepon'], 3);
-      var uAlamatIdx = findColIdxFlexible_(uHeaders, ['alamat', 'rumah', 'lokasi'], 9);
-
-      for (var u = 1; u < uData.length; u++) {
-        var noKk = String((uKkIdx !== -1 ? uData[u][uKkIdx] : '') || ('KK-' + u)).trim();
-        if (noKk && !kkMap[noKk]) {
-          totalKk++;
-          kkMap[noKk] = {
-            noKk: noKk,
-            nama: String((uNamaIdx !== -1 ? uData[u][uNamaIdx] : '') || 'Warga').trim(),
-            noHp: String((uHpIdx !== -1 ? uData[u][uHpIdx] : '') || '-').trim(),
-            alamat: String((uAlamatIdx !== -1 ? uData[u][uAlamatIdx] : '') || 'RT 010 RW 05').trim(),
-            isLunas: false
-          };
-        }
-      }
+    // 3. HITUNG ARUS KAS BULAN INI DAN TOTAL SISA SALDO AKHIR
+    var pocketNames = ['kasRt', 'kasDuka', 'kasSampah', 'kasSosial'];
+    for (var k = 0; k < pocketNames.length; k++) {
+      var key = pocketNames[k];
+      dompet[key].arusBulanIni = dompet[key].masuk - dompet[key].keluar;
+      dompet[key].saldo = dompet[key].saldoAwal + dompet[key].arusBulanIni;
     }
 
-    var iurSheet = ss.getSheetByName('IURAN') || ss.getSheetByName('Iuran') || ss.getSheetByName('iuran');
-    if (iurSheet && iurSheet.getLastRow() > 1) {
-      var iData = iurSheet.getDataRange().getDisplayValues();
-      var iHeaders = iData[0];
-      var iKkIdx = findColIdxFlexible_(iHeaders, ['no_kk', 'nokk', 'no kk', 'kk'], 2);
-      var iBulanIdx = findColIdxFlexible_(iHeaders, ['bulan_tahun', 'bulantahun', 'periode', 'bulan'], 4);
-      var iStatusIdx = findColIdxFlexible_(iHeaders, ['status_bayar', 'statusbayar', 'status'], 7);
-
-      var curBulanClean = curBulan.toLowerCase();
-      var curTahunClean = curTahun.toLowerCase();
-
-      for (var j = 1; j < iData.length; j++) {
-        var rKk = String(iKkIdx !== -1 ? iData[j][iKkIdx] : '').trim();
-        var rBulan = String(iBulanIdx !== -1 ? iData[j][iBulanIdx] : '').toLowerCase().trim();
-        var rStatus = String(iStatusIdx !== -1 ? iData[j][iStatusIdx] : '').toLowerCase().trim();
-
-        var isMatchMonth = (rBulan.indexOf(curBulanClean) !== -1 || rBulan.indexOf('09') !== -1 || rBulan.indexOf('sep') !== -1);
-        var isPaid = (rStatus === 'sudah bayar' || rStatus === 'lunas' || rStatus === 'approved' || rStatus === 'sukses' || rStatus === 'sudah');
-
-        if (isMatchMonth && isPaid && kkMap[rKk] && !kkMap[rKk].isLunas) {
-          kkMap[rKk].isLunas = true;
-          lunasKk++;
-        }
-      }
-    }
-
-    var belumLunasList = [];
-    for (var k in kkMap) {
-      if (kkMap.hasOwnProperty(k) && !kkMap[k].isLunas) {
-        belumLunasList.push(kkMap[k]);
-      }
-    }
-
-    var persentaseKepatuhan = totalKk > 0 ? Math.round((lunasKk / totalKk) * 100) : 0;
-
-    var kepatuhan = {
-      periode: curBulan + ' ' + curTahun,
-      totalKk: totalKk,
-      lunasKk: lunasKk,
-      belumLunasCount: belumLunasList.length,
-      persentase: persentaseKepatuhan,
-      belumLunasList: belumLunasList
-    };
-
-    var payload = {
-      dompet: dompet,
-      kepatuhan: kepatuhan,
-      pengeluaranList: pengeluaranList,
-      totalPemasukan: dompet.kasRt.masuk,
-      totalPengeluaran: dompet.kasRt.keluar,
-      sisaSaldo: dompet.kasRt.saldo,
-      mutasi: pengeluaranList
-    };
+    pengeluaranList.reverse();
 
     return {
       success: true,
-      data: payload
+      data: {
+        dompet: dompet,
+        pengeluaranList: pengeluaranList,
+        targetBulan: targetBulan,
+        targetTahun: targetTahun
+      }
     };
   } catch (err) {
     return {
@@ -189,7 +234,7 @@ function getKasRtDetails(targetBulan, targetTahun) {
 function savePengeluaranRutin(payload) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var kasSheet = getKasSheetSafe_(ss);
+    var kasSheet = getSheetByNameFlexible_(ss, 'KAS_RT');
     if (!kasSheet) throw new Error('Sheet KAS_RT tidak ditemukan!');
 
     var rawHeaders = kasSheet.getRange(1, 1, 1, kasSheet.getLastColumn()).getDisplayValues()[0];
@@ -209,8 +254,14 @@ function savePengeluaranRutin(payload) {
     var newRow = new Array(maxLen);
     for (var c = 0; c < maxLen; c++) newRow[c] = '';
 
+    var tglFormatted = String(payload.tanggal || Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy')).trim();
+    if (tglFormatted.indexOf('-') !== -1) {
+      var parts = tglFormatted.split('-');
+      if (parts.length === 3) tglFormatted = parts[2] + '/' + parts[1] + '/' + parts[0];
+    }
+
     if (idCol !== -1) newRow[idCol] = newId;
-    if (tglCol !== -1) newRow[tglCol] = String(payload.tanggal || Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy')).trim();
+    if (tglCol !== -1) newRow[tglCol] = tglFormatted;
     if (jenisCol !== -1) newRow[jenisCol] = 'Pengeluaran';
     if (katCol !== -1) newRow[katCol] = String(payload.kategori || 'Iuran Kas').trim();
     if (ketCol !== -1) newRow[ketCol] = String(payload.keterangan || '').trim();
@@ -240,7 +291,7 @@ function getIuranList(params) {
     var filterJenis = (params.jenis || 'SEMUA').toLowerCase().trim();
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var iurSheet = ss.getSheetByName('IURAN') || ss.getSheetByName('Iuran') || ss.getSheetByName('iuran');
+    var iurSheet = getSheetByNameFlexible_(ss, 'IURAN');
 
     if (!iurSheet || iurSheet.getLastRow() <= 1) {
       return { success: true, data: [], total: 0, page: 1, totalPages: 0 };
@@ -283,6 +334,10 @@ function getIuranList(params) {
       var matchStatus = filterStatus === 'semua' || statusBayar.toLowerCase() === filterStatus;
       var matchJenis = filterJenis === 'semua' || jenisIuran.toLowerCase() === filterJenis;
 
+      if (filterJenis === 'iuran sampah' && (jenisIuran.toLowerCase().indexOf('sampah') !== -1 || jenisIuran.toLowerCase().indexOf('kebersihan') !== -1)) {
+        matchJenis = true;
+      }
+
       if (matchSearch && matchStatus && matchJenis) {
         filtered.push({
           idIuran: idIuran,
@@ -299,7 +354,6 @@ function getIuranList(params) {
       }
     }
 
-    // PRIORITAS UTAMA: Status 'Menunggu' selalu diletakkan paling atas halaman 1
     filtered.sort(function(a, b) {
       var aIsMenunggu = String(a.statusBayar || '').toLowerCase().trim() === 'menunggu';
       var bIsMenunggu = String(b.statusBayar || '').toLowerCase().trim() === 'menunggu';
@@ -328,7 +382,7 @@ function getIuranList(params) {
 function saveBayarIuran(payload) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var iurSheet = ss.getSheetByName('IURAN') || ss.getSheetByName('Iuran') || ss.getSheetByName('iuran');
+    var iurSheet = getSheetByNameFlexible_(ss, 'IURAN');
     if (!iurSheet) throw new Error('Sheet IURAN tidak ditemukan!');
 
     var nowStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
@@ -374,18 +428,8 @@ function saveBayarIuran(payload) {
     if (crtCol !== -1) newRow[crtCol] = nowStr;
 
     iurSheet.appendRow(newRow);
-
-    if (statusAwal === 'Sudah bayar') {
-      logIuranToKasRt_(ss, {
-        tanggal: tglBayar,
-        kategori: payload.jenisIuran,
-        keterangan: 'Iuran dari ' + payload.namaWarga + ' (' + noKwi + ')',
-        nominal: payload.nominal,
-        bulanTahun: payload.bulanTahun
-      });
-    }
-
     SpreadsheetApp.flush();
+
     return {
       success: true,
       message: 'Pembayaran iuran berhasil dikirim!' + (isSuper ? ' (Status: Lunas)' : ' (Menunggu persetujuan bendahara)')
@@ -398,7 +442,7 @@ function saveBayarIuran(payload) {
 function updateStatusIuran(payload) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var iurSheet = ss.getSheetByName('IURAN') || ss.getSheetByName('Iuran') || ss.getSheetByName('iuran');
+    var iurSheet = getSheetByNameFlexible_(ss, 'IURAN');
     if (!iurSheet) throw new Error('Sheet IURAN tidak ditemukan!');
 
     var data = iurSheet.getDataRange().getDisplayValues();
@@ -408,11 +452,6 @@ function updateStatusIuran(payload) {
     var statusIdx = findColIdxFlexible_(headers, ['status_bayar', 'statusbayar', 'status'], 7);
     var appIdx = findColIdxFlexible_(headers, ['approved_by', 'approvedby', 'petugas'], 9);
     var tglIdx = findColIdxFlexible_(headers, ['tanggal_bayar', 'tanggal', 'tgl'], 8);
-    var namaIdx = findColIdxFlexible_(headers, ['nama_warga', 'namawarga', 'nama'], 3);
-    var kwiIdx = findColIdxFlexible_(headers, ['no_kuitansi', 'kuitansi', 'kwitansi'], 1);
-    var jenisIdx = findColIdxFlexible_(headers, ['jenis_iuran', 'jenisiuran', 'jenis'], 5);
-    var nomIdx = findColIdxFlexible_(headers, ['nominal', 'jumlah', 'total', 'rp'], 6);
-    var bulanIdx = findColIdxFlexible_(headers, ['bulan_tahun', 'bulantahun', 'periode', 'bulan'], 4);
 
     var targetId = String(payload.idIuran || '').trim();
     var newStatus = String(payload.status || 'Sudah bayar').trim();
@@ -420,12 +459,10 @@ function updateStatusIuran(payload) {
     var todayStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy');
 
     var foundRow = -1;
-    var rowData = null;
 
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][idIdx]).trim() === targetId) {
         foundRow = i + 1;
-        rowData = data[i];
         break;
       }
     }
@@ -438,16 +475,6 @@ function updateStatusIuran(payload) {
     iurSheet.getRange(foundRow, appIdx + 1).setValue(newStatus === 'Sudah bayar' ? verifikator : '-');
     if (newStatus === 'Sudah bayar') {
       iurSheet.getRange(foundRow, tglIdx + 1).setValue(todayStr);
-    }
-
-    if (newStatus === 'Sudah bayar' && rowData) {
-      logIuranToKasRt_(ss, {
-        tanggal: todayStr,
-        kategori: rowData[jenisIdx],
-        keterangan: 'Iuran dari ' + rowData[namaIdx] + ' (' + rowData[kwiIdx] + ')',
-        nominal: rowData[nomIdx],
-        bulanTahun: rowData[bulanIdx]
-      });
     }
 
     SpreadsheetApp.flush();
@@ -463,7 +490,7 @@ function updateStatusIuran(payload) {
 function getAllIuranForExport(filterJenis) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var iurSheet = ss.getSheetByName('IURAN') || ss.getSheetByName('Iuran') || ss.getSheetByName('iuran');
+    var iurSheet = getSheetByNameFlexible_(ss, 'IURAN');
     if (!iurSheet || iurSheet.getLastRow() <= 1) return { success: true, data: [] };
 
     var data = iurSheet.getDataRange().getDisplayValues();
@@ -486,7 +513,12 @@ function getAllIuranForExport(filterJenis) {
       var jenis = String(row[jenisIdx]).trim();
 
       if (status === 'sudah bayar' || status === 'lunas' || status === 'approved') {
-        if (filter === 'semua' || jenis.toLowerCase() === filter) {
+        var match = (filter === 'semua' || jenis.toLowerCase() === filter);
+        if (filter === 'iuran sampah' && (jenis.toLowerCase().indexOf('sampah') !== -1 || jenis.toLowerCase().indexOf('kebersihan') !== -1)) {
+          match = true;
+        }
+
+        if (match) {
           list.push({
             noKuitansi: row[kwiIdx] || '-',
             namaWarga: row[namaIdx] || '-',
@@ -505,56 +537,17 @@ function getAllIuranForExport(filterJenis) {
   }
 }
 
-function logIuranToKasRt_(ss, item) {
-  try {
-    var kasSheet = getKasSheetSafe_(ss);
-    if (!kasSheet) return;
-
-    var newId = generateIuranSequentialId_('KAS', 'KAS_RT');
-    var nowStr = Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd/MM/yyyy HH:mm:ss');
-    var headers = kasSheet.getRange(1, 1, 1, kasSheet.getLastColumn()).getDisplayValues()[0];
-
-    var idCol = findColIdxFlexible_(headers, ['id_kas', 'idkas', 'id'], 0);
-    var tglCol = findColIdxFlexible_(headers, ['tanggal', 'tgl', 'date'], 1);
-    var jenisCol = findColIdxFlexible_(headers, ['jenis_kas', 'jeniskas', 'jenis', 'tipe'], 2);
-    var katCol = findColIdxFlexible_(headers, ['kategori', 'category', 'pos'], 3);
-    var ketCol = findColIdxFlexible_(headers, ['keterangan', 'ket', 'deskripsi'], 4);
-    var nomCol = findColIdxFlexible_(headers, ['nominal', 'jumlah', 'total', 'rp'], 5);
-    var blnCol = findColIdxFlexible_(headers, ['bulan_tahun', 'bulantahun', 'periode', 'bulan'], 6);
-    var crtCol = findColIdxFlexible_(headers, ['created_at', 'createdat', 'timestamp'], 7);
-
-    var maxLen = Math.max(headers.length, 8);
-    var row = new Array(maxLen);
-    for (var c = 0; c < maxLen; c++) row[c] = '';
-
-    if (idCol !== -1) row[idCol] = newId;
-    if (tglCol !== -1) row[tglCol] = item.tanggal;
-    if (jenisCol !== -1) row[jenisCol] = 'Pemasukan';
-    if (katCol !== -1) row[katCol] = item.kategori || 'Iuran Kas';
-    if (ketCol !== -1) row[ketCol] = item.keterangan || 'Iuran Masuk';
-    if (nomCol !== -1) row[nomCol] = String(item.nominal || 0);
-    if (blnCol !== -1) row[blnCol] = item.bulanTahun;
-    if (crtCol !== -1) row[crtCol] = nowStr;
-
-    kasSheet.appendRow(row);
-  } catch (e) {
-    Logger.log('Gagal log kas RT: ' + e.toString());
-  }
-}
-
-function getKasSheetSafe_(ss) {
+function getSheetByNameFlexible_(ss, targetName) {
   if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
-  var candidates = ['KAS_RT', 'Kas_RT', 'KAS RT', 'kas_rt', 'KASRT', 'KAS'];
-  for (var i = 0; i < candidates.length; i++) {
-    var sh = ss.getSheetByName(candidates[i]);
-    if (sh) return sh;
-  }
+  var direct = ss.getSheetByName(targetName);
+  if (direct) return direct;
 
-  var allSheets = ss.getSheets();
-  for (var s = 0; s < allSheets.length; s++) {
-    var sName = allSheets[s].getName().trim().toUpperCase().replace(/[\s_]/g, '');
-    if (sName === 'KASRT' || sName === 'KAS') {
-      return allSheets[s];
+  var targetClean = targetName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  var sheets = ss.getSheets();
+  for (var i = 0; i < sheets.length; i++) {
+    var sNameClean = sheets[i].getName().toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (sNameClean === targetClean) {
+      return sheets[i];
     }
   }
   return null;
@@ -562,15 +555,23 @@ function getKasSheetSafe_(ss) {
 
 function findColIdxFlexible_(headers, candidates, fallbackIdx) {
   if (!headers || !Array.isArray(headers)) return fallbackIdx !== undefined ? fallbackIdx : -1;
+  
   for (var i = 0; i < headers.length; i++) {
     var h = String(headers[i] || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
     for (var c = 0; c < candidates.length; c++) {
       var cand = candidates[c].toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (h === cand || h.indexOf(cand) !== -1 || cand.indexOf(h) !== -1) {
-        return i;
-      }
+      if (h === cand) return i;
     }
   }
+
+  for (var j = 0; j < headers.length; j++) {
+    var h2 = String(headers[j] || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    for (var k = 0; k < candidates.length; k++) {
+      var cand2 = candidates[k].toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (h2.indexOf(cand2) !== -1 || cand2.indexOf(h2) !== -1) return j;
+    }
+  }
+
   return fallbackIdx !== undefined ? fallbackIdx : -1;
 }
 
@@ -584,7 +585,7 @@ function parseKasNominalSafe_(val) {
 function generateIuranSequentialId_(prefix, sheetName) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = (sheetName === 'KAS_RT') ? getKasSheetSafe_(ss) : ss.getSheetByName(sheetName);
+    var sheet = getSheetByNameFlexible_(ss, sheetName);
     if (!sheet || sheet.getLastRow() <= 1) return prefix + '-0001';
 
     var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 1).getDisplayValues();
