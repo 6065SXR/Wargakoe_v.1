@@ -6,10 +6,12 @@
     if (!noKk) return;
     currentFamilyNoKk = noKk;
 
-    var container = document.getElementById('anggotaKeluargaContainer');
-    container.innerHTML = '<div class="col-span-3 text-center p-6 text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat...</div>';
+    var container = document.getElementById('anggotaKeluargaContainer') || document.getElementById('familyMembersContainer');
+    if (container) {
+      container.innerHTML = '<div class="col-span-3 text-center p-6 text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat anggota keluarga...</div>';
+    }
 
-    if (typeof google !== 'undefined' && google.script && google.script.run) {
+    if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.getFamilyDetails) {
       google.script.run.withSuccessHandler(function(res) {
         if (res && res.success) renderFamilyDetails(res.data);
       }).getFamilyDetails(noKk);
@@ -43,16 +45,26 @@
     if (data.kepalaKeluarga) {
       currentKepalaKeluargaData = data.kepalaKeluarga;
       currentFamilyNoKk = data.kepalaKeluarga.noKk;
-      document.getElementById('myFamilyHeadName').innerText = data.kepalaKeluarga.nama;
-      document.getElementById('myFamilyKkNumber').innerText = data.kepalaKeluarga.noKk;
-      document.getElementById('myFamilyAddress').innerText = data.kepalaKeluarga.alamat || '-';
+      
+      var elHead = document.getElementById('myFamilyHeadName') || document.getElementById('familyHeadName');
+      if (elHead) elHead.innerText = data.kepalaKeluarga.nama;
+      
+      var elKk = document.getElementById('myFamilyKkNumber') || document.getElementById('familyNoKk');
+      if (elKk) elKk.innerText = 'No KK: ' + data.kepalaKeluarga.noKk;
+      
+      var elAddr = document.getElementById('myFamilyAddress') || document.getElementById('familyAddress');
+      if (elAddr) elAddr.innerText = data.kepalaKeluarga.alamat || '-';
     }
-    var container = document.getElementById('anggotaKeluargaContainer');
+
+    var container = document.getElementById('anggotaKeluargaContainer') || document.getElementById('familyMembersContainer');
+    if (!container) return;
     container.innerHTML = '';
+
     if (!data.anggota || data.anggota.length === 0) {
       container.innerHTML = '<div class="col-span-3 p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs">Belum ada anggota keluarga tambahan.</div>';
       return;
     }
+
     for (var i = 0; i < data.anggota.length; i++) {
       var agt = data.anggota[i];
       var card = document.createElement('div');
@@ -87,34 +99,46 @@
     var isSuperAdmin = currentUser && (currentUser.role === 'Super Admin');
     var noKkVal = data.noKk || (currentUser ? currentUser.noKk : '');
 
-    document.getElementById('editProfilOrigNoKk').value = noKkVal;
+    var elOrigKk = document.getElementById('editProfilOrigNoKk');
+    if (elOrigKk) elOrigKk.value = noKkVal;
 
     var inputKk = document.getElementById('editProfilNoKk');
     var badgeKk = document.getElementById('editProfilNoKkBadge');
     var hintKk = document.getElementById('editProfilNoKkHint');
 
-    inputKk.value = noKkVal;
-
-    if (isSuperAdmin) {
-      inputKk.readOnly = false;
-      inputKk.classList.remove('bg-slate-100', 'cursor-not-allowed', 'text-slate-600');
-      inputKk.classList.add('bg-white', 'text-slate-800');
-      badgeKk.innerText = 'Dapat Diedit (Super Admin)';
-      badgeKk.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800';
-      hintKk.innerText = '* Hak Akses Super Admin: Nomor KK dapat disesuaikan jika diperlukan.';
-      hintKk.className = 'text-[10px] text-emerald-600 mt-1 font-medium';
-    } else {
-      inputKk.readOnly = true;
-      inputKk.classList.remove('bg-white', 'text-slate-800');
-      inputKk.classList.add('bg-slate-100', 'cursor-not-allowed', 'text-slate-600');
-      badgeKk.innerText = 'Terkunci';
-      badgeKk.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800';
-      hintKk.innerText = '* Nomor KK dikunci. Perubahan nomor KK hanya dapat dilakukan dengan izin Super Admin.';
-      hintKk.className = 'text-[10px] text-amber-600 mt-1 font-medium';
+    if (inputKk) {
+      inputKk.value = noKkVal;
+      if (isSuperAdmin) {
+        inputKk.readOnly = false;
+        inputKk.classList.remove('bg-slate-100', 'cursor-not-allowed', 'text-slate-600');
+        inputKk.classList.add('bg-white', 'text-slate-800');
+        if (badgeKk) {
+          badgeKk.innerText = 'Dapat Diedit (Super Admin)';
+          badgeKk.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800';
+        }
+        if (hintKk) {
+          hintKk.innerText = '* Hak Akses Super Admin: Nomor KK dapat disesuaikan jika diperlukan.';
+          hintKk.className = 'text-[10px] text-emerald-600 mt-1 font-medium';
+        }
+      } else {
+        inputKk.readOnly = true;
+        inputKk.classList.remove('bg-white', 'text-slate-800');
+        inputKk.classList.add('bg-slate-100', 'cursor-not-allowed', 'text-slate-600');
+        if (badgeKk) {
+          badgeKk.innerText = 'Terkunci';
+          badgeKk.className = 'text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800';
+        }
+        if (hintKk) {
+          hintKk.innerText = '* Nomor KK dikunci. Perubahan nomor KK hanya dapat dilakukan dengan izin Super Admin.';
+          hintKk.className = 'text-[10px] text-amber-600 mt-1 font-medium';
+        }
+      }
     }
 
-    document.getElementById('editProfilNoKtp').value = data.noKtp || (currentUser ? currentUser.noKtp : '') || '';
-    document.getElementById('editProfilNama').value = data.nama || (currentUser ? currentUser.nama : '') || '';
+    var elKtp = document.getElementById('editProfilNoKtp');
+    if (elKtp) elKtp.value = data.noKtp || (currentUser ? currentUser.noKtp : '') || '';
+    var elNama = document.getElementById('editProfilNama');
+    if (elNama) elNama.value = data.nama || (currentUser ? currentUser.nama : '') || '';
     
     var tglRaw = data.tanggalLahir || (currentUser ? currentUser.tanggalLahir : '') || '';
     if (tglRaw.indexOf('/') !== -1) {
@@ -123,22 +147,34 @@
         tglRaw = parts[2] + '-' + ('0' + parts[1]).slice(-2) + '-' + ('0' + parts[0]).slice(-2);
       }
     }
-    document.getElementById('editProfilTglLahir').value = tglRaw;
+    var elTgl = document.getElementById('editProfilTglLahir');
+    if (elTgl) elTgl.value = tglRaw;
 
     var umurVal = String(data.umur || (currentUser ? currentUser.umur : 0) || 0);
-    document.getElementById('editProfilUmurVal').value = umurVal;
-    document.getElementById('editProfilUmurDisplay').value = umurVal + ' Tahun';
+    var elUmurVal = document.getElementById('editProfilUmurVal');
+    if (elUmurVal) elUmurVal.value = umurVal;
+    var elUmurDisp = document.getElementById('editProfilUmurDisplay');
+    if (elUmurDisp) elUmurDisp.value = umurVal + ' Tahun';
 
-    document.getElementById('editProfilGender').value = data.jenisKelamin || (currentUser ? currentUser.jenisKelamin : 'Laki-laki') || 'Laki-laki';
-    document.getElementById('editProfilStatusKeluarga').value = data.statusKeluarga || (currentUser ? currentUser.statusKeluarga : 'Suami') || 'Suami';
-    document.getElementById('editProfilStatusRumah').value = data.statusRumah || (currentUser ? currentUser.statusRumah : 'Pribadi') || 'Pribadi';
-    document.getElementById('editProfilPendidikan').value = data.pendidikan || (currentUser ? currentUser.pendidikan : 'SMA') || 'SMA';
-    document.getElementById('editProfilPekerjaan').value = data.pekerjaan || (currentUser ? currentUser.pekerjaan : 'Wiraswasta') || 'Wiraswasta';
-    document.getElementById('editProfilNoHp').value = data.noHp || (currentUser ? currentUser.noHp : '') || '';
-    document.getElementById('editProfilAlamat').value = data.alamat || (currentUser ? currentUser.alamat : '') || '';
-    document.getElementById('editProfilPassword').value = '';
+    var elGender = document.getElementById('editProfilGender');
+    if (elGender) elGender.value = data.jenisKelamin || (currentUser ? currentUser.jenisKelamin : 'Laki-laki') || 'Laki-laki';
+    var elStatusKel = document.getElementById('editProfilStatusKeluarga');
+    if (elStatusKel) elStatusKel.value = data.statusKeluarga || (currentUser ? currentUser.statusKeluarga : 'Suami') || 'Suami';
+    var elStatusRumah = document.getElementById('editProfilStatusRumah');
+    if (elStatusRumah) elStatusRumah.value = data.statusRumah || (currentUser ? currentUser.statusRumah : 'Pribadi') || 'Pribadi';
+    var elPend = document.getElementById('editProfilPendidikan');
+    if (elPend) elPend.value = data.pendidikan || (currentUser ? currentUser.pendidikan : 'SMA') || 'SMA';
+    var elPek = document.getElementById('editProfilPekerjaan');
+    if (elPek) elPek.value = data.pekerjaan || (currentUser ? currentUser.pekerjaan : 'Wiraswasta') || 'Wiraswasta';
+    var elHp = document.getElementById('editProfilNoHp');
+    if (elHp) elHp.value = data.noHp || (currentUser ? currentUser.noHp : '') || '';
+    var elAlamat = document.getElementById('editProfilAlamat');
+    if (elAlamat) elAlamat.value = data.alamat || (currentUser ? currentUser.alamat : '') || '';
+    var elPass = document.getElementById('editProfilPassword');
+    if (elPass) elPass.value = '';
 
-    document.getElementById('modalEditProfilKepala').classList.remove('hidden');
+    var modal = document.getElementById('modalEditProfilKepala');
+    if (modal) modal.classList.remove('hidden');
   }
 
   function handleSaveProfilKepala() {
@@ -155,32 +191,36 @@
     }
 
     var payload = {
-      origNoKk: document.getElementById('editProfilOrigNoKk').value,
-      noKk: document.getElementById('editProfilNoKk').value.trim(),
+      origNoKk: document.getElementById('editProfilOrigNoKk') ? document.getElementById('editProfilOrigNoKk').value : '',
+      noKk: document.getElementById('editProfilNoKk') ? document.getElementById('editProfilNoKk').value.trim() : '',
       noKtp: ktpVal,
-      nama: document.getElementById('editProfilNama').value.trim(),
-      tanggalLahir: document.getElementById('editProfilTglLahir').value,
-      umur: document.getElementById('editProfilUmurVal').value,
-      jenisKelamin: document.getElementById('editProfilGender').value,
-      statusKeluarga: document.getElementById('editProfilStatusKeluarga').value,
-      statusRumah: document.getElementById('editProfilStatusRumah').value,
-      pendidikan: document.getElementById('editProfilPendidikan').value,
-      pekerjaan: document.getElementById('editProfilPekerjaan').value,
-      alamat: document.getElementById('editProfilAlamat').value.trim(),
+      nama: document.getElementById('editProfilNama') ? document.getElementById('editProfilNama').value.trim() : '',
+      tanggalLahir: document.getElementById('editProfilTglLahir') ? document.getElementById('editProfilTglLahir').value : '',
+      umur: document.getElementById('editProfilUmurVal') ? document.getElementById('editProfilUmurVal').value : '',
+      jenisKelamin: document.getElementById('editProfilGender') ? document.getElementById('editProfilGender').value : '',
+      statusKeluarga: document.getElementById('editProfilStatusKeluarga') ? document.getElementById('editProfilStatusKeluarga').value : '',
+      statusRumah: document.getElementById('editProfilStatusRumah') ? document.getElementById('editProfilStatusRumah').value : '',
+      pendidikan: document.getElementById('editProfilPendidikan') ? document.getElementById('editProfilPendidikan').value : '',
+      pekerjaan: document.getElementById('editProfilPekerjaan') ? document.getElementById('editProfilPekerjaan').value : '',
+      alamat: document.getElementById('editProfilAlamat') ? document.getElementById('editProfilAlamat').value.trim() : '',
       noHp: hpVal,
-      password: document.getElementById('editProfilPassword').value.trim(),
+      password: document.getElementById('editProfilPassword') ? document.getElementById('editProfilPassword').value.trim() : '',
       isSuperAdmin: currentUser && (currentUser.role === 'Super Admin')
     };
 
     var btn = document.getElementById('btnSaveProfilKepala');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i><span>Menyimpan...</span>';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i><span>Menyimpan...</span>';
+    }
 
-    if (typeof google !== 'undefined' && google.script && google.script.run) {
+    if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.updateProfilWarga) {
       google.script.run
         .withSuccessHandler(function(res) {
-          btn.disabled = false;
-          btn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1"></i><span>Simpan Perubahan Profil</span>';
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1"></i><span>Simpan Perubahan Profil</span>';
+          }
           if (res && res.success) {
             closeModal('modalEditProfilKepala');
             showToast(res.message, 'success');
@@ -198,9 +238,12 @@
 
               currentKepalaKeluargaData = currentUser;
               currentFamilyNoKk = currentUser.noKk;
-              document.getElementById('myFamilyHeadName').innerText = currentUser.nama;
-              document.getElementById('myFamilyKkNumber').innerText = currentUser.noKk;
-              document.getElementById('myFamilyAddress').innerText = currentUser.alamat || '-';
+              var elHead = document.getElementById('myFamilyHeadName') || document.getElementById('familyHeadName');
+              if (elHead) elHead.innerText = currentUser.nama;
+              var elKk = document.getElementById('myFamilyKkNumber') || document.getElementById('familyNoKk');
+              if (elKk) elKk.innerText = currentUser.noKk;
+              var elAddr = document.getElementById('myFamilyAddress') || document.getElementById('familyAddress');
+              if (elAddr) elAddr.innerText = currentUser.alamat || '-';
             }
 
             fetchFamilyData(currentFamilyNoKk);
@@ -210,39 +253,20 @@
           }
         })
         .withFailureHandler(function(err) {
-          btn.disabled = false;
-          btn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1"></i><span>Simpan Perubahan Profil</span>';
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1"></i><span>Simpan Perubahan Profil</span>';
+          }
           showToast('Kesalahan server: ' + err.toString(), 'error');
         })
         .updateProfilWarga(payload);
     } else {
       setTimeout(function() {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1"></i><span>Simpan Perubahan Profil</span>';
-        closeModal('modalEditProfilKepala');
-
-        if (currentUser) {
-          currentUser.nama = payload.nama;
-          currentUser.noKtp = payload.noKtp;
-          currentUser.noHp = payload.noHp;
-          currentUser.tanggalLahir = payload.tanggalLahir;
-          currentUser.umur = payload.umur;
-          currentUser.jenisKelamin = payload.jenisKelamin;
-          currentUser.statusKeluarga = payload.statusKeluarga;
-          currentUser.statusRumah = payload.statusRumah;
-          currentUser.pendidikan = payload.pendidikan;
-          currentUser.pekerjaan = payload.pekerjaan;
-          currentUser.alamat = payload.alamat;
-          if (payload.isSuperAdmin && payload.noKk) currentUser.noKk = payload.noKk;
-
-          saveStoredSession(currentUser);
-          document.getElementById('userNameDesktop').innerText = currentUser.nama;
-          document.getElementById('welcomeBannerText').innerText = 'Halo, ' + currentUser.nama + '!';
-          document.getElementById('myFamilyHeadName').innerText = currentUser.nama;
-          document.getElementById('myFamilyKkNumber').innerText = currentUser.noKk;
-          document.getElementById('myFamilyAddress').innerText = currentUser.alamat;
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1"></i><span>Simpan Perubahan Profil</span>';
         }
-
+        closeModal('modalEditProfilKepala');
         showToast('Profil Anda berhasil diperbarui (Demo Mode).', 'success');
         fetchFamilyData(currentFamilyNoKk);
       }, 500);
@@ -250,13 +274,17 @@
   }
 
   function openModalTambahAnggota() {
-    document.getElementById('formAnggotaId').value = '';
-    document.getElementById('formAnggotaKk').value = currentFamilyNoKk || (currentUser ? currentUser.noKk : '');
+    var elId = document.getElementById('formAnggotaId');
+    if (elId) elId.value = '';
+    var elKk = document.getElementById('formAnggotaKk');
+    if (elKk) elKk.value = currentFamilyNoKk || (currentUser ? currentUser.noKk : '');
     
     var ktpInput = document.getElementById('formAnggotaKtp');
-    ktpInput.value = '';
-    ktpInput.readOnly = false;
-    ktpInput.dataset.isAuto = 'false';
+    if (ktpInput) {
+      ktpInput.value = '';
+      ktpInput.readOnly = false;
+      ktpInput.dataset.isAuto = 'false';
+    }
 
     var hintEl = document.getElementById('formAnggotaKtpHint');
     if (hintEl) {
@@ -264,56 +292,76 @@
       hintEl.className = 'text-[10px] text-slate-500 mt-1 font-medium';
     }
 
-    document.getElementById('formAnggotaNama').value = '';
-    document.getElementById('formAnggotaHubungan').value = 'Istri';
-    document.getElementById('formAnggotaTglLahir').value = '';
-    document.getElementById('formAnggotaUmurDisplay').value = '';
-    document.getElementById('formAnggotaUmurVal').value = '0';
-    document.getElementById('formAnggotaGender').value = 'Perempuan';
-    document.getElementById('modalAnggotaTitle').innerText = 'Tambah Anggota Keluarga';
-    document.getElementById('modalAnggota').classList.remove('hidden');
+    var elNama = document.getElementById('formAnggotaNama');
+    if (elNama) elNama.value = '';
+    var elHub = document.getElementById('formAnggotaHubungan');
+    if (elHub) elHub.value = 'Istri';
+    var elTgl = document.getElementById('formAnggotaTglLahir');
+    if (elTgl) elTgl.value = '';
+    var elUmurDisp = document.getElementById('formAnggotaUmurDisplay');
+    if (elUmurDisp) elUmurDisp.value = '';
+    var elUmurVal = document.getElementById('formAnggotaUmurVal');
+    if (elUmurVal) elUmurVal.value = '0';
+    var elGender = document.getElementById('formAnggotaGender');
+    if (elGender) elGender.value = 'Perempuan';
+    var elTitle = document.getElementById('modalAnggotaTitle');
+    if (elTitle) elTitle.innerText = 'Tambah Anggota Keluarga';
+    
+    var modal = document.getElementById('modalAnggota');
+    if (modal) modal.classList.remove('hidden');
   }
 
   function editAnggota(id, ktpEnc, namaEnc, hubEnc, tglEnc, umur, gender) {
     var rawKtp = decodeURIComponent(ktpEnc || '');
     var ageVal = parseInt(umur, 10) || 0;
 
-    document.getElementById('formAnggotaId').value = id;
-    document.getElementById('formAnggotaKk').value = currentFamilyNoKk || (currentUser ? currentUser.noKk : '');
-    document.getElementById('formAnggotaNama').value = decodeURIComponent(namaEnc || '');
-    document.getElementById('formAnggotaHubungan').value = decodeURIComponent(hubEnc || '');
-    document.getElementById('formAnggotaTglLahir').value = decodeURIComponent(tglEnc || '');
-    document.getElementById('formAnggotaUmurVal').value = String(ageVal);
-    document.getElementById('formAnggotaUmurDisplay').value = ageVal + ' Tahun';
-    document.getElementById('formAnggotaGender').value = gender || 'Perempuan';
+    var elId = document.getElementById('formAnggotaId');
+    if (elId) elId.value = id;
+    var elKk = document.getElementById('formAnggotaKk');
+    if (elKk) elKk.value = currentFamilyNoKk || (currentUser ? currentUser.noKk : '');
+    var elNama = document.getElementById('formAnggotaNama');
+    if (elNama) elNama.value = decodeURIComponent(namaEnc || '');
+    var elHub = document.getElementById('formAnggotaHubungan');
+    if (elHub) elHub.value = decodeURIComponent(hubEnc || '');
+    var elTgl = document.getElementById('formAnggotaTglLahir');
+    if (elTgl) elTgl.value = decodeURIComponent(tglEnc || '');
+    var elUmurVal = document.getElementById('formAnggotaUmurVal');
+    if (elUmurVal) elUmurVal.value = String(ageVal);
+    var elUmurDisp = document.getElementById('formAnggotaUmurDisplay');
+    if (elUmurDisp) elUmurDisp.value = ageVal + ' Tahun';
+    var elGender = document.getElementById('formAnggotaGender');
+    if (elGender) elGender.value = gender || 'Perempuan';
 
     var ktpInput = document.getElementById('formAnggotaKtp');
     var hintEl = document.getElementById('formAnggotaKtpHint');
-    ktpInput.value = rawKtp;
-
-    if (ageVal < 17) {
-      if (!rawKtp) {
-        ktpInput.value = generateRandomNik(decodeURIComponent(tglEnc || ''));
-        ktpInput.dataset.isAuto = 'true';
+    if (ktpInput) {
+      ktpInput.value = rawKtp;
+      if (ageVal < 17) {
+        if (!rawKtp) {
+          ktpInput.value = generateRandomNik(decodeURIComponent(tglEnc || ''));
+          ktpInput.dataset.isAuto = 'true';
+        } else {
+          ktpInput.dataset.isAuto = 'false';
+        }
+        ktpInput.readOnly = true;
+        if (hintEl) {
+          hintEl.innerText = '* NIK otomatis untuk anak di bawah 17 tahun';
+          hintEl.className = 'text-[10px] text-emerald-600 mt-1 font-semibold';
+        }
       } else {
+        ktpInput.readOnly = false;
         ktpInput.dataset.isAuto = 'false';
-      }
-      ktpInput.readOnly = true;
-      if (hintEl) {
-        hintEl.innerText = '* NIK otomatis untuk anak di bawah 17 tahun';
-        hintEl.className = 'text-[10px] text-emerald-600 mt-1 font-semibold';
-      }
-    } else {
-      ktpInput.readOnly = false;
-      ktpInput.dataset.isAuto = 'false';
-      if (hintEl) {
-        hintEl.innerText = '* Wajib 16 digit sesuai e-KTP fisik asli';
-        hintEl.className = 'text-[10px] text-brand-pink mt-1 font-semibold';
+        if (hintEl) {
+          hintEl.innerText = '* Wajib 16 digit sesuai e-KTP fisik asli';
+          hintEl.className = 'text-[10px] text-brand-pink mt-1 font-semibold';
+        }
       }
     }
 
-    document.getElementById('modalAnggotaTitle').innerText = 'Edit Data Anggota Keluarga';
-    document.getElementById('modalAnggota').classList.remove('hidden');
+    var elTitle = document.getElementById('modalAnggotaTitle');
+    if (elTitle) elTitle.innerText = 'Edit Data Anggota Keluarga';
+    var modal = document.getElementById('modalAnggota');
+    if (modal) modal.classList.remove('hidden');
   }
 
   function handleAnggotaTglLahirChange(birthDateStr) {
@@ -324,26 +372,28 @@
     var ktpInput = document.getElementById('formAnggotaKtp');
     var hintEl = document.getElementById('formAnggotaKtpHint');
 
-    if (age < 17) {
-      var isAutoOrEmpty = !ktpInput.value || ktpInput.dataset.isAuto === 'true' || ktpInput.readOnly;
-      if (isAutoOrEmpty) {
-        ktpInput.value = generateRandomNik(birthDateStr);
-        ktpInput.dataset.isAuto = 'true';
-      }
-      ktpInput.readOnly = true;
-      if (hintEl) {
-        hintEl.innerText = '* NIK otomatis dibuat (anak < 17 tahun belum memiliki e-KTP)';
-        hintEl.className = 'text-[10px] text-emerald-600 mt-1 font-semibold';
-      }
-    } else {
-      if (ktpInput.dataset.isAuto === 'true') {
-        ktpInput.value = '';
-        ktpInput.dataset.isAuto = 'false';
-      }
-      ktpInput.readOnly = false;
-      if (hintEl) {
-        hintEl.innerText = '* Wajib 16 digit sesuai nomor e-KTP fisik asli';
-        hintEl.className = 'text-[10px] text-brand-pink mt-1 font-semibold';
+    if (ktpInput) {
+      if (age < 17) {
+        var isAutoOrEmpty = !ktpInput.value || ktpInput.dataset.isAuto === 'true' || ktpInput.readOnly;
+        if (isAutoOrEmpty) {
+          ktpInput.value = generateRandomNik(birthDateStr);
+          ktpInput.dataset.isAuto = 'true';
+        }
+        ktpInput.readOnly = true;
+        if (hintEl) {
+          hintEl.innerText = '* NIK otomatis dibuat (anak < 17 tahun belum memiliki e-KTP)';
+          hintEl.className = 'text-[10px] text-emerald-600 mt-1 font-semibold';
+        }
+      } else {
+        if (ktpInput.dataset.isAuto === 'true') {
+          ktpInput.value = '';
+          ktpInput.dataset.isAuto = 'false';
+        }
+        ktpInput.readOnly = false;
+        if (hintEl) {
+          hintEl.innerText = '* Wajib 16 digit sesuai nomor e-KTP fisik asli';
+          hintEl.className = 'text-[10px] text-brand-pink mt-1 font-semibold';
+        }
       }
     }
   }
@@ -376,25 +426,29 @@
     }
 
     var payload = {
-      idAnggota: document.getElementById('formAnggotaId').value,
-      noKk: document.getElementById('formAnggotaKk').value || currentFamilyNoKk || (currentUser ? currentUser.noKk : ''),
+      idAnggota: document.getElementById('formAnggotaId') ? document.getElementById('formAnggotaId').value : '',
+      noKk: (document.getElementById('formAnggotaKk') ? document.getElementById('formAnggotaKk').value : '') || currentFamilyNoKk || (currentUser ? currentUser.noKk : ''),
       noKtp: ktpVal,
-      namaAnggota: document.getElementById('formAnggotaNama').value.trim(),
-      hubunganKeluarga: document.getElementById('formAnggotaHubungan').value,
-      tanggalLahir: document.getElementById('formAnggotaTglLahir').value,
-      umur: document.getElementById('formAnggotaUmurVal').value,
-      jenisKelamin: document.getElementById('formAnggotaGender').value
+      namaAnggota: document.getElementById('formAnggotaNama') ? document.getElementById('formAnggotaNama').value.trim() : '',
+      hubunganKeluarga: document.getElementById('formAnggotaHubungan') ? document.getElementById('formAnggotaHubungan').value : '',
+      tanggalLahir: document.getElementById('formAnggotaTglLahir') ? document.getElementById('formAnggotaTglLahir').value : '',
+      umur: document.getElementById('formAnggotaUmurVal') ? document.getElementById('formAnggotaUmurVal').value : '',
+      jenisKelamin: document.getElementById('formAnggotaGender') ? document.getElementById('formAnggotaGender').value : ''
     };
 
     var btn = document.getElementById('btnSaveAnggota');
-    btn.disabled = true;
-    btn.innerText = 'Menyimpan...';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = 'Menyimpan...';
+    }
 
-    if (typeof google !== 'undefined' && google.script && google.script.run) {
+    if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.saveAnggotaKeluarga) {
       google.script.run
         .withSuccessHandler(function(res) {
-          btn.disabled = false;
-          btn.innerText = 'Simpan Data';
+          if (btn) {
+            btn.disabled = false;
+            btn.innerText = 'Simpan Data';
+          }
           if (res && res.success) {
             closeModal('modalAnggota');
             showToast(res.message, 'success');
@@ -405,15 +459,19 @@
           }
         })
         .withFailureHandler(function(err) {
-          btn.disabled = false;
-          btn.innerText = 'Simpan Data';
+          if (btn) {
+            btn.disabled = false;
+            btn.innerText = 'Simpan Data';
+          }
           showToast('Kesalahan server: ' + err.toString(), 'error');
         })
         .saveAnggotaKeluarga(payload);
     } else {
       setTimeout(function() {
-        btn.disabled = false;
-        btn.innerText = 'Simpan Data';
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = 'Simpan Data';
+        }
         closeModal('modalAnggota');
         showToast('Berhasil disimpan (Demo).', 'success');
         fetchFamilyData(currentFamilyNoKk);
@@ -422,10 +480,9 @@
   }
 
   function handleDeleteAnggota(idAnggota) {
-    if (!confirm('Apakah Anda yakin ingin menghapus anggota keluarga ini?')) return;
     showToast('Menghapus...', 'info');
 
-    if (typeof google !== 'undefined' && google.script && google.script.run) {
+    if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.deleteAnggotaKeluarga) {
       google.script.run.withSuccessHandler(function(res) {
         if (res && res.success) {
           showToast(res.message, 'success');
@@ -445,40 +502,87 @@
 
   function fetchMadingData() {
     var search = document.getElementById('filterMadingSearch') ? document.getElementById('filterMadingSearch').value : '';
-    var container = document.getElementById('madingListContainer');
-    container.innerHTML = '<div class="col-span-full p-6 text-center text-slate-400"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat mading...</div>';
+    var container = document.getElementById('madingCardsContainer') || document.getElementById('madingListContainer');
+    if (container) {
+      container.innerHTML = '<div class="col-span-full p-6 text-center text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat pengumuman mading...</div>';
+    }
 
     var params = { search: search, role: currentUser ? currentUser.role : 'Warga' };
-    if (typeof google !== 'undefined' && google.script && google.script.run) {
+    if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.getMadingList) {
       google.script.run.withSuccessHandler(function(res) {
-        if (res && res.success) renderMadingCards(res.data);
+        if (res && res.success) {
+          renderMadingCards(res.data || []);
+          renderDashboardRecentMading(res.data || []);
+        } else {
+          if (container) container.innerHTML = '<div class="col-span-full p-6 text-center text-slate-400 text-xs">Belum ada pengumuman mading.</div>';
+          renderDashboardRecentMading([]);
+        }
+      }).withFailureHandler(function(err) {
+        console.warn('Gagal fetch mading:', err);
+        renderDashboardRecentMading([]);
       }).getMadingList(params);
     } else {
       setTimeout(function() {
-        renderMadingCards([
+        var dummy = [
           { idMading: 'MAD-0001', judul: 'Haul', tanggalKegiatan: '4 September 2026', note: 'haul', statusPublish: 'Published', pembuat: 'Komeng (Petugas Sampah)', createdAt: '04/09/2026 19:20:59' },
           { idMading: 'MAD-0002', judul: 'Rapat Sampah', tanggalKegiatan: '7 September 2026', note: 'Nanti ada rapat mengenai sampah di balai warga.', statusPublish: 'Published', pembuat: 'Komeng (Petugas Sampah)', createdAt: '31/08/2026 16:30:36' },
           { idMading: 'MAD-0003', judul: 'Rapat Pleno Warga & Pembahasan Kas', tanggalKegiatan: '25 September 2026', note: 'Pertemuan rutin bulanan bertempat di balai warga lantai 1 pukul 19:30 WIB.', statusPublish: 'Published', pembuat: 'Siti Rahmawati (Bendahara)', createdAt: '31/08/2026 16:29:04' },
           { idMading: 'MAD-0004', judul: 'Kerja Bakti Bulanan RT 05', tanggalKegiatan: '10 September 2026', note: 'Diharapkan seluruh warga hadir membawa alat kebersihan masing-masing di pos ronda utama pukul 07:00 WIB.', statusPublish: 'Published', pembuat: 'Budi Santoso (Ketua RT)', createdAt: '31/08/2026 16:29:04' }
-        ]);
+        ];
+        renderMadingCards(dummy);
+        renderDashboardRecentMading(dummy);
       }, 300);
     }
   }
 
-  function renderMadingCards(list) {
-    var container = document.getElementById('madingListContainer');
+  function renderDashboardRecentMading(list) {
+    var container = document.getElementById('dashboardRecentMadingContainer');
+    if (!container) return;
     container.innerHTML = '';
+
+    if (!list || list.length === 0) {
+      container.innerHTML = '<div class="p-3 text-center text-slate-400 italic text-xs"><i class="fa-solid fa-bullhorn text-slate-300 block text-lg mb-1"></i>Belum ada pengumuman warga terbaru.</div>';
+      return;
+    }
+
+    var html = '';
+    for (var i = 0; i < Math.min(list.length, 3); i++) {
+      var item = list[i];
+      html += 
+        '<div class="p-2.5 rounded-xl bg-slate-50 border border-slate-100 hover:border-amber-200 transition space-y-1">' +
+          '<div class="flex items-center justify-between gap-2">' +
+            '<h5 class="font-bold text-slate-800 text-xs truncate">' + (item.judul || 'Pengumuman') + '</h5>' +
+            '<span class="text-[10px] text-amber-600 font-mono shrink-0">' + (item.tanggalKegiatan || item.createdAt || '-') + '</span>' +
+          '</div>' +
+          '<p class="text-[11px] text-slate-600 line-clamp-2 leading-relaxed">' + (item.note || '-') + '</p>' +
+        '</div>';
+    }
+    container.innerHTML = html;
+  }
+
+  function renderMadingCards(list) {
+    var container = document.getElementById('madingCardsContainer') || document.getElementById('madingListContainer');
+    if (!container) return;
+    container.innerHTML = '';
+    
     if (!list || list.length === 0) {
       container.innerHTML = '<div class="col-span-full p-8 text-center bg-white rounded-2xl border border-slate-200 text-slate-400 text-xs">Belum ada informasi mading.</div>';
       return;
     }
 
-    var isPengurus = currentUser && (currentUser.role === 'Super Admin' || currentUser.statusUser === 'Pengurus RT' || currentUser.role === 'Pengurus RT' || currentUser.role === 'Ketua RT' || currentUser.role === 'Bendahara' || currentUser.role === 'Sekretaris');
+    var isPengurus = currentUser && (
+      currentUser.role === 'Super Admin' ||
+      currentUser.statusUser === 'Pengurus RT' ||
+      currentUser.role === 'Pengurus RT' ||
+      currentUser.role === 'Ketua RT' ||
+      currentUser.role === 'Bendahara' ||
+      currentUser.role === 'Sekretaris'
+    );
 
     for (var i = 0; i < list.length; i++) {
       var m = list[i];
       var card = document.createElement('div');
-      card.className = 'dashboard-card p-5 flex flex-col justify-between relative overflow-hidden hover:shadow-md transition';
+      card.className = 'dashboard-card p-5 bg-white border border-slate-200 flex flex-col justify-between relative overflow-hidden hover:shadow-md transition';
 
       var badgeStatus = m.statusPublish === 'Published' 
         ? '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">Published</span>' 
@@ -544,59 +648,82 @@
       console.error('Gagal membuka detail mading:', err);
     }
   }
-  // Expose ke global window agar bisa dipanggil juga dari kartu dashboard
   window.openModalDetailMading = openModalDetailMading;
 
   function openModalTambahMading() {
-    document.getElementById('formMadingId').value = '';
-    document.getElementById('formMadingJudul').value = '';
-    document.getElementById('formMadingTgl').value = '';
-    document.getElementById('formMadingNote').value = '';
-    document.getElementById('formMadingStatus').value = 'Published';
-    document.getElementById('modalMadingTitle').innerText = 'Buat Pengumuman Mading';
-    document.getElementById('modalMading').classList.remove('hidden');
+    var elId = document.getElementById('formMadingId');
+    if (elId) elId.value = '';
+    var elJudul = document.getElementById('formMadingJudul');
+    if (elJudul) elJudul.value = '';
+    var elTgl = document.getElementById('formMadingTgl');
+    if (elTgl) elTgl.value = '';
+    var elNote = document.getElementById('formMadingNote');
+    if (elNote) elNote.value = '';
+    var elSt = document.getElementById('formMadingStatus');
+    if (elSt) elSt.value = 'Published';
+    var elTitle = document.getElementById('modalMadingTitle');
+    if (elTitle) elTitle.innerText = 'Buat Pengumuman Mading';
+    
+    var modal = document.getElementById('modalMading');
+    if (modal) modal.classList.remove('hidden');
   }
 
   function editMading(id, judulEnc, tglEnc, noteEnc, status) {
-    document.getElementById('formMadingId').value = id;
-    document.getElementById('formMadingJudul').value = decodeURIComponent(judulEnc);
-    document.getElementById('formMadingTgl').value = decodeURIComponent(tglEnc);
-    document.getElementById('formMadingNote').value = decodeURIComponent(noteEnc);
-    document.getElementById('formMadingStatus').value = status;
-    document.getElementById('modalMadingTitle').innerText = 'Edit Informasi Mading';
-    document.getElementById('modalMading').classList.remove('hidden');
+    var elId = document.getElementById('formMadingId');
+    if (elId) elId.value = id;
+    var elJudul = document.getElementById('formMadingJudul');
+    if (elJudul) elJudul.value = decodeURIComponent(judulEnc);
+    var elTgl = document.getElementById('formMadingTgl');
+    if (elTgl) elTgl.value = decodeURIComponent(tglEnc);
+    var elNote = document.getElementById('formMadingNote');
+    if (elNote) elNote.value = decodeURIComponent(noteEnc);
+    var elSt = document.getElementById('formMadingStatus');
+    if (elSt) elSt.value = status;
+    var elTitle = document.getElementById('modalMadingTitle');
+    if (elTitle) elTitle.innerText = 'Edit Informasi Mading';
+    
+    var modal = document.getElementById('modalMading');
+    if (modal) modal.classList.remove('hidden');
   }
 
   function handleSaveMading() {
     var pembuatNama = currentUser ? (currentUser.nama + ' (' + (currentUser.role || currentUser.statusUser || 'Pengurus') + ')') : 'Pengurus RT';
     var payload = {
-      idMading: document.getElementById('formMadingId').value,
-      judul: document.getElementById('formMadingJudul').value,
-      tanggalKegiatan: document.getElementById('formMadingTgl').value,
-      note: document.getElementById('formMadingNote').value,
-      statusPublish: document.getElementById('formMadingStatus').value,
+      idMading: document.getElementById('formMadingId') ? document.getElementById('formMadingId').value : '',
+      judul: document.getElementById('formMadingJudul') ? document.getElementById('formMadingJudul').value : '',
+      tanggalKegiatan: document.getElementById('formMadingTgl') ? document.getElementById('formMadingTgl').value : '',
+      note: document.getElementById('formMadingNote') ? document.getElementById('formMadingNote').value : '',
+      statusPublish: document.getElementById('formMadingStatus') ? document.getElementById('formMadingStatus').value : 'Published',
       pembuat: pembuatNama
     };
 
     var btn = document.getElementById('btnSaveMading');
-    btn.disabled = true;
-    btn.innerText = 'Menyimpan...';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = 'Menyimpan...';
+    }
 
-    if (typeof google !== 'undefined' && google.script && google.script.run) {
+    if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.saveMading) {
       google.script.run.withSuccessHandler(function(res) {
-        btn.disabled = false;
-        btn.innerText = 'Simpan & Publikasikan';
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = 'Simpan & Publikasikan';
+        }
         closeModal('modalMading');
         if (res && res.success) {
           showToast(res.message, 'success');
           fetchMadingData();
           refreshData();
+        } else {
+          showToast(res ? res.message : 'Gagal menyimpan.', 'error');
         }
       }).saveMading(payload);
     } else {
       setTimeout(function() {
-        btn.disabled = false;
-        btn.innerText = 'Simpan & Publikasikan';
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = 'Simpan & Publikasikan';
+        }
         closeModal('modalMading');
         showToast('Berhasil disimpan.', 'success');
         fetchMadingData();
@@ -606,12 +733,14 @@
 
   function deleteMading(idMading) {
     showToast('Menghapus...', 'info');
-    if (typeof google !== 'undefined' && google.script && google.script.run) {
+    if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.deleteMading) {
       google.script.run.withSuccessHandler(function(res) {
         if (res && res.success) {
           showToast(res.message, 'success');
           fetchMadingData();
           refreshData();
+        } else {
+          showToast(res ? res.message : 'Gagal menghapus.', 'error');
         }
       }).deleteMading(idMading);
     } else {
@@ -621,4 +750,16 @@
       }, 300);
     }
   }
+
+  window.fetchMadingData = fetchMadingData;
+  window.loadMadingData = fetchMadingData;
+  window.renderDashboardRecentMading = renderDashboardRecentMading;
+
+  // Otomatis isi kartu dashboard mading jika masih tertahan status "Memuat..."
+  setTimeout(function() {
+    var dMading = document.getElementById('dashboardRecentMadingContainer');
+    if (dMading && dMading.innerText.indexOf('Memuat') !== -1) {
+      fetchMadingData();
+    }
+  }, 400);
 </script>
