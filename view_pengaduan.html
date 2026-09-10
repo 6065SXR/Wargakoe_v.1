@@ -1,0 +1,390 @@
+<!-- ======================================================= -->
+<!-- TAB: PENGADUAN WARGA                                    -->
+<!-- ======================================================= -->
+<div id="tab-pengaduan" class="hidden space-y-6">
+  
+  <!-- MOBILE BACK BUTTON -->
+  <div class="md:hidden mb-1">
+    <button type="button" onclick="switchTab('dashboard')" class="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-white text-slate-800 text-xs font-bold shadow-sm hover:bg-slate-50 active:scale-95 transition-all border border-slate-200">
+      <i class="fa-solid fa-arrow-left-long text-brand-amber text-sm"></i>
+      <span>Kembali ke Dashboard</span>
+    </button>
+  </div>
+
+  <!-- HEADER CARD PENGADUAN & KONTROL UTAMA -->
+  <div class="dashboard-card p-5 sm:p-6 bg-white border border-slate-200">
+    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-5">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200 uppercase">Aspirasi &amp; Fasilitas</span>
+          <span class="text-xs text-slate-500 font-mono">RT 010 / RW 05</span>
+        </div>
+        <h3 class="text-base sm:text-lg font-bold text-slate-900 mt-1">Layanan Pengaduan &amp; Fasilitas Warga</h3>
+        <p class="text-xs text-slate-500">Laporkan kendala fasilitas, pantau tindak lanjut pengurus, dan lihat laporan bersama warga RT 010</p>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button type="button" onclick="openModalBuatPengaduan()" class="w-full sm:w-auto px-5 py-2.5 rounded-full bg-gradient-to-r from-brand-amber to-brand-pink hover:opacity-95 text-white text-xs font-bold shadow-md transition flex items-center justify-center gap-2 active:scale-95">
+          <i class="fa-solid fa-camera-retro"></i>
+          <span>Buat Pengaduan Baru</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 4 RINGKASAN STATUS PENGADUAN -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-slate-100">
+      <div class="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/80 flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center text-sm font-bold flex-shrink-0">
+          <i class="fa-solid fa-clock-rotate-left"></i>
+        </div>
+        <div class="min-w-0">
+          <span class="text-[10px] font-bold text-amber-800 uppercase block tracking-wider truncate">Menunggu</span>
+          <h4 class="text-base sm:text-lg font-black text-amber-900 mt-0.5" id="countAduanMenunggu">0</h4>
+        </div>
+      </div>
+
+      <div class="p-3.5 rounded-2xl bg-sky-50/80 border border-sky-200/80 flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center text-sm font-bold flex-shrink-0">
+          <i class="fa-solid fa-inbox"></i>
+        </div>
+        <div class="min-w-0">
+          <span class="text-[10px] font-bold text-sky-800 uppercase block tracking-wider truncate">Diterima</span>
+          <h4 class="text-base sm:text-lg font-black text-sky-900 mt-0.5" id="countAduanDiterima">0</h4>
+        </div>
+      </div>
+
+      <div class="p-3.5 rounded-2xl bg-purple-50/80 border border-purple-200/80 flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center text-sm font-bold flex-shrink-0">
+          <i class="fa-solid fa-screwdriver-wrench"></i>
+        </div>
+        <div class="min-w-0">
+          <span class="text-[10px] font-bold text-purple-800 uppercase block tracking-wider truncate">Perbaikan</span>
+          <h4 class="text-base sm:text-lg font-black text-purple-900 mt-0.5" id="countAduanPerbaikan">0</h4>
+        </div>
+      </div>
+
+      <div class="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200/80 flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm font-bold flex-shrink-0">
+          <i class="fa-solid fa-circle-check"></i>
+        </div>
+        <div class="min-w-0">
+          <span class="text-[10px] font-bold text-emerald-800 uppercase block tracking-wider truncate">Selesai</span>
+          <h4 class="text-base sm:text-lg font-black text-emerald-900 mt-0.5" id="countAduanSelesai">0</h4>
+        </div>
+      </div>
+    </div>
+
+    <!-- FILTER BAR PENGADUAN -->
+    <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 mt-4 pt-3 border-t border-slate-100">
+      <div class="relative sm:col-span-2">
+        <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400 text-xs">
+          <i class="fa-solid fa-magnifying-glass"></i>
+        </span>
+        <input type="text" id="filterAduanSearch" oninput="debounceFetchPengaduan()" placeholder="Cari judul aduan, nama warga, lokasi..." class="input-pill w-full pl-9 text-xs">
+      </div>
+
+      <select id="filterAduanKategori" onchange="fetchPengaduanData(0)" class="input-pill w-full text-xs">
+        <option value="SEMUA">Semua Kategori Masalah</option>
+        <option value="Fasilitas Umum & Lampu Jalan">Lampu Jalan &amp; Fasilitas</option>
+        <option value="Air Bersih & PAM">Air Bersih / PAM</option>
+        <option value="Jalanan & Saluran Air">Jalanan &amp; Saluran Air</option>
+        <option value="Sampah & Kebersihan">Sampah &amp; Kebersihan</option>
+        <option value="Keamanan & Ketertiban">Keamanan &amp; Ketertiban</option>
+        <option value="Lain-lain">Lain-lain</option>
+      </select>
+
+      <select id="filterAduanStatus" onchange="fetchPengaduanData(0)" class="input-pill w-full text-xs">
+        <option value="SEMUA">Semua Status Aduan</option>
+        <option value="Menunggu">Menunggu Verifikasi</option>
+        <option value="Diterima">Laporan Diterima</option>
+        <option value="Dalam Perbaikan">Dalam Perbaikan</option>
+        <option value="Selesai">Selesai / Sudah Diperbaiki</option>
+        <option value="Ditolak">Ditolak</option>
+      </select>
+    </div>
+
+    <div class="flex items-center justify-between mt-3 pt-2 text-xs">
+      <label class="inline-flex items-center gap-2 cursor-pointer select-none text-slate-700 font-semibold">
+        <input type="checkbox" id="filterAduanOnlyMine" onchange="fetchPengaduanData(0)" class="rounded text-amber-500 focus:ring-amber-400">
+        <span>Tampilkan Pengaduan Saya Saja</span>
+      </label>
+      <span class="text-[11px] text-slate-400" id="pengaduanTotalInfo">Memuat data aduan...</span>
+    </div>
+  </div>
+
+  <!-- CONTAINER KARTU PENGADUAN WARGA -->
+  <div id="pengaduanCardsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <!-- Diisi otomatis oleh JavaScript -->
+  </div>
+</div>
+
+<!-- MODAL 1: FORM BUAT PENGADUAN WARGA BARU -->
+<div id="modalBuatPengaduan" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+  <div class="bg-white rounded-3xl w-full max-w-lg p-6 relative border border-slate-200 text-slate-800 max-h-[90vh] overflow-y-auto shadow-2xl">
+    <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center text-sm shadow-sm">
+          <i class="fa-solid fa-bullhorn"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">Form Pengaduan Warga RT 010</h3>
+          <p class="text-[10px] text-slate-500">Laporkan kendala fasilitas di lingkungan Anda</p>
+        </div>
+      </div>
+      <button onclick="closeModal('modalBuatPengaduan')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-base"></i></button>
+    </div>
+
+    <form id="formPengaduanWarga" onsubmit="event.preventDefault(); handleSavePengaduan();" class="space-y-3.5 text-xs">
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Nama Pelapor &amp; Kontak</label>
+        <input type="text" id="aduanNamaPelapor" readonly class="input-pill w-full bg-slate-100 font-bold text-slate-600 border-slate-200 cursor-not-allowed">
+      </div>
+
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Kategori Masalah / Gangguan</label>
+        <select id="aduanKategori" required class="input-pill w-full font-bold bg-white text-slate-800 border-slate-200">
+          <option value="Fasilitas Umum & Lampu Jalan">Lampu Penerangan Jalan / Fasilitas Umum</option>
+          <option value="Air Bersih & PAM">Air Bersih / Gangguan PAM</option>
+          <option value="Jalanan & Saluran Air">Jalanan Rusak / Saluran Air Mampet</option>
+          <option value="Sampah & Kebersihan">Sampah Liar &amp; Kebersihan Lingkungan</option>
+          <option value="Keamanan & Ketertiban">Keamanan &amp; Ketertiban Warga</option>
+          <option value="Lain-lain">Lain-lain</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Judul Singkat Aduan</label>
+        <input type="text" id="aduanJudul" required placeholder="Contoh: Lampu Jalan Gang 2 Padam" class="input-pill w-full bg-slate-50 border-slate-200 text-slate-800">
+      </div>
+
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Lokasi Detail Kejadian</label>
+        <input type="text" id="aduanLokasi" required placeholder="Contoh: Depan Tiang Listrik No. 04 Gang 2" class="input-pill w-full bg-slate-50 border-slate-200 text-slate-800">
+      </div>
+
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Rincian Kendala / Keterangan Masalah</label>
+        <textarea id="aduanDeskripsi" rows="3" required placeholder="Jelaskan kondisi masalah, sejak kapan terjadi, atau dampak bagi warga sekitar..." class="w-full p-3 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:border-amber-500 text-slate-800 text-xs"></textarea>
+      </div>
+
+      <!-- UPLOAD & FOTO BUKTI DENGAN KOMPRESI OTOMATIS -->
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Foto Bukti Lapangan (Kamera / Galeri)</label>
+        <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+          <input type="file" id="aduanFileInput" accept="image/*" capture="environment" onchange="handleAduanPhotoSelect(event)" class="block w-full text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3.5 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-amber-800 hover:file:bg-amber-200 cursor-pointer">
+          
+          <div id="aduanPhotoPreviewBox" class="hidden relative w-full h-44 rounded-xl overflow-hidden border border-slate-300 bg-black flex items-center justify-center shadow-inner">
+            <img id="aduanPhotoPreviewImg" src="" class="w-full h-full object-contain">
+            <button type="button" onclick="clearAduanPhotoPreview()" class="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-rose-600 text-white font-bold text-[10px] shadow hover:bg-rose-700 transition">
+              <i class="fa-solid fa-trash mr-1"></i>Hapus Foto
+            </button>
+            <span class="absolute bottom-2 left-2 text-[9px] bg-black/60 text-white px-2 py-0.5 rounded-full font-mono">Foto Terkompresi</span>
+          </div>
+          <p class="text-[10px] text-slate-400">* Foto otomatis dikompresi agar hemat kuota dan cepat diproses sistem.</p>
+        </div>
+      </div>
+
+      <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
+        <button type="button" onclick="closeModal('modalBuatPengaduan')" class="px-4 py-2.5 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold transition">Batal</button>
+        <button type="submit" id="btnSubmitPengaduan" class="px-5 py-2.5 rounded-full bg-gradient-to-r from-brand-amber to-brand-pink text-white font-bold shadow-md hover:opacity-95 transition flex items-center gap-1.5 active:scale-95">
+          <i class="fa-solid fa-paper-plane"></i>
+          <span>Kirim Laporan Pengaduan</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ======================================================= -->
+<!-- MODAL 2: DETAIL LENGKAP & PRATINJAU PENGADUAN WARGA     -->
+<!-- (Bisa dibuka oleh semua warga & ditinjau pengurus RT)   -->
+<!-- ======================================================= -->
+<div id="modalDetailPengaduan" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+  <div class="bg-white rounded-3xl w-full max-w-lg p-6 relative border border-slate-200 text-slate-800 max-h-[92vh] overflow-y-auto shadow-2xl">
+    <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+      <div class="flex items-center gap-2.5">
+        <div class="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center text-base shadow-sm">
+          <i class="fa-solid fa-clipboard-list"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">Detail Laporan Pengaduan Warga</h3>
+          <p class="text-[10px] text-slate-500 font-mono" id="detailAduanId">ID: ADU-0000</p>
+        </div>
+      </div>
+      <button onclick="closeModal('modalDetailPengaduan')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-base"></i></button>
+    </div>
+
+    <div class="space-y-4 text-xs">
+      <!-- STATUS & KATEGORI -->
+      <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+        <div id="detailAduanKatBadge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200">
+          <i class="fa-solid fa-triangle-exclamation text-amber-500"></i>
+          <span id="detailAduanKatText">Fasilitas Umum</span>
+        </div>
+        <div id="detailAduanStatusBadge">
+          <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+            Menunggu
+          </span>
+        </div>
+      </div>
+
+      <!-- JUDUL & LOKASI -->
+      <div>
+        <span class="text-[10px] uppercase font-extrabold tracking-wider text-slate-400 block mb-1">Perihal Kendala</span>
+        <h2 class="text-base font-black text-slate-900 leading-snug" id="detailAduanJudul">-</h2>
+        <div class="flex items-center gap-2 text-slate-600 mt-1.5 font-medium">
+          <i class="fa-solid fa-location-dot text-rose-500 flex-shrink-0"></i>
+          <span id="detailAduanLokasi">-</span>
+        </div>
+      </div>
+
+      <!-- DESKRIPSI RINCI -->
+      <div>
+        <span class="text-[10px] uppercase font-extrabold tracking-wider text-slate-400 block mb-1">Rincian Laporan Masalah</span>
+        <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-slate-700 leading-relaxed whitespace-pre-line text-xs" id="detailAduanDeskripsi">
+          -
+        </div>
+      </div>
+
+      <!-- FOTO BUKTI LAPANGAN -->
+      <div id="detailAduanPhotoContainer" class="hidden">
+        <span class="text-[10px] uppercase font-extrabold tracking-wider text-slate-400 block mb-1">Foto Bukti Lapangan</span>
+        <div class="relative w-full h-48 rounded-2xl overflow-hidden bg-black/90 border border-slate-200 group cursor-pointer" id="detailAduanPhotoClickArea">
+          <img id="detailAduanPhotoImg" src="" class="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300">
+          <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-bold text-xs gap-1.5">
+            <i class="fa-solid fa-magnifying-glass-plus text-base"></i>
+            <span>Klik untuk Memperbesar Foto</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- INFORMASI PELAPOR -->
+      <div class="p-3 rounded-2xl bg-slate-50/80 border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5 text-[11px] text-slate-500">
+        <div>
+          <span><i class="fa-solid fa-user mr-1 text-slate-400"></i>Pelapor: <strong class="text-slate-800" id="detailAduanPelapor">-</strong></span>
+          <span class="ml-2 font-mono" id="detailAduanHp">-</span>
+        </div>
+        <div>
+          <span><i class="fa-solid fa-clock mr-1 text-slate-400"></i><span id="detailAduanCreatedAt">-</span></span>
+        </div>
+      </div>
+
+      <!-- TANGGAPAN / CATATAN RESMI PENGURUS RT -->
+      <div id="detailAduanResponseContainer" class="hidden p-3.5 rounded-2xl bg-indigo-50/80 border border-indigo-200 text-indigo-950 space-y-1">
+        <div class="flex items-center justify-between text-xs font-bold text-indigo-700">
+          <span class="flex items-center gap-1.5">
+            <i class="fa-solid fa-comment-dots"></i>
+            <span>Tanggapan Resmi Pengurus RT:</span>
+          </span>
+          <span class="text-[10px] text-indigo-600 font-normal font-mono" id="detailAduanPetugas">Petugas Penangan</span>
+        </div>
+        <p class="text-xs italic text-slate-700 pt-1 leading-relaxed whitespace-pre-line" id="detailAduanCatatan">-</p>
+      </div>
+
+      <!-- FOOTER AKSI -->
+      <div class="pt-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 border-t border-slate-100">
+        <button type="button" onclick="closeModal('modalDetailPengaduan')" class="px-5 py-2.5 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold transition">
+          Tutup
+        </button>
+        <!-- Tombol Aksi Pengurus (Tampil bila status belum selesai) -->
+        <button type="button" id="btnDetailAksiPengurus" class="hidden px-5 py-2.5 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md transition items-center justify-center gap-2 active:scale-95">
+          <i class="fa-solid fa-screwdriver-wrench"></i>
+          <span>Tindak Lanjut / Ambil Aksi</span>
+        </button>
+        <!-- Tombol Hapus Pengurus (Hanya tampil bila status sudah SELESAI) -->
+        <button type="button" id="btnDetailHapusPengurus" class="hidden px-5 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-md transition items-center justify-center gap-2 active:scale-95">
+          <i class="fa-solid fa-trash-can"></i>
+          <span>Hapus Laporan Selesai</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL 3: AKSI & TINDAK LANJUT PENGURUS RT -->
+<div id="modalAksiPengaduan" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+  <div class="bg-white rounded-3xl w-full max-w-md p-6 relative border border-slate-200 text-slate-800 shadow-2xl">
+    <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm">
+          <i class="fa-solid fa-screwdriver-wrench"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900">Tindak Lanjut Pengaduan Warga</h3>
+          <p class="text-[10px] text-slate-500" id="aksiAduanSubtitle">ID: ADU-0000</p>
+        </div>
+      </div>
+      <button onclick="closeModal('modalAksiPengaduan')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-base"></i></button>
+    </div>
+
+    <form id="formAksiPengaduan" onsubmit="event.preventDefault(); submitAksiPengaduan();" class="space-y-3.5 text-xs">
+      <input type="hidden" id="aksiAduanId" value="">
+
+      <div class="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
+        <p><strong>Perihal Aduan:</strong> <span id="aksiAduanJudul" class="font-bold text-slate-900">-</span></p>
+        <p><strong>Pelapor:</strong> <span id="aksiAduanPelapor" class="text-slate-700">-</span></p>
+      </div>
+
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Perbarui Status Penanganan</label>
+        <select id="aksiAduanStatus" required class="input-pill w-full font-bold bg-white text-slate-800 border-slate-200">
+          <option value="Diterima">Laporan Diterima (Sedang Dijadwalkan)</option>
+          <option value="Dalam Perbaikan">Dalam Penanganan / Perbaikan</option>
+          <option value="Selesai">Selesai / Sudah Diperbaiki</option>
+          <option value="Ditolak">Ditolak (Aduan Tidak Sesuai)</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Petugas / Tim yang Menangani</label>
+        <input type="text" id="aksiAduanPetugas" required placeholder="Contoh: Petugas PLN / Bpk Budi (Ketua RT)" class="input-pill w-full bg-slate-50 border-slate-200 text-slate-800">
+      </div>
+
+      <div>
+        <label class="block font-semibold text-slate-700 mb-1">Catatan &amp; Tanggapan Resmi Pengurus</label>
+        <textarea id="aksiAduanCatatan" rows="3" required placeholder="Tuliskan keterangan perbaikan, jadwal penanganan, atau tindak lanjut yang dilakukan..." class="w-full p-3 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:border-indigo-500 text-slate-800 text-xs"></textarea>
+      </div>
+
+      <div class="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
+        <button type="button" onclick="closeModal('modalAksiPengaduan')" class="px-4 py-2.5 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold transition">Batal</button>
+        <button type="submit" id="btnSubmitAksiAduan" class="px-5 py-2.5 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md transition flex items-center gap-1.5 active:scale-95">
+          <i class="fa-solid fa-check"></i>
+          <span>Simpan Tanggapan</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL 4: LIHAT FOTO BUKTI LENGKAP (ZOOM FULLSCREEN) -->
+<div id="modalFotoPengaduan" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+  <div class="relative max-w-2xl w-full max-h-[90vh] flex flex-col items-center">
+    <button onclick="closeModal('modalFotoPengaduan')" class="self-end mb-2 w-9 h-9 rounded-full bg-white/20 text-white hover:bg-white/30 flex items-center justify-center transition">
+      <i class="fa-solid fa-xmark text-lg"></i>
+    </button>
+    <div class="bg-slate-900 rounded-2xl overflow-hidden border border-white/20 shadow-2xl w-full max-h-[80vh] flex items-center justify-center">
+      <img id="viewFotoAduanImg" src="" class="w-full h-full object-contain max-h-[75vh]">
+    </div>
+    <p class="text-xs text-white/80 mt-2 font-medium" id="viewFotoAduanJudul">-</p>
+  </div>
+</div>
+
+<!-- MODAL 5: KONFIRMASI HAPUS PENGADUAN SELESAI (KHUSUS PENGURUS RT) -->
+<div id="modalKonfirmasiHapusAduan" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+  <div class="bg-white rounded-3xl w-full max-w-sm p-6 relative border border-slate-200 text-slate-800 shadow-2xl text-center">
+    <div class="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center text-xl mx-auto mb-3 shadow-sm">
+      <i class="fa-solid fa-trash-can"></i>
+    </div>
+    <h3 class="text-sm font-bold text-slate-900">Hapus Pengaduan Selesai?</h3>
+    <p class="text-xs text-slate-500 mt-2 leading-relaxed" id="konfirmasiHapusAduanText">Laporan pengaduan yang telah tuntas ini akan dihapus permanen dari sistem.</p>
+    <input type="hidden" id="konfirmasiHapusAduanId" value="">
+
+    <div class="pt-4 flex items-center justify-center gap-2 border-t border-slate-100 mt-5">
+      <button type="button" onclick="closeModal('modalKonfirmasiHapusAduan')" class="px-4 py-2 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-bold transition">Batal</button>
+      <button type="button" id="btnKonfirmasiHapusAduan" onclick="executeDeletePengaduan()" class="px-5 py-2 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md transition flex items-center gap-1.5 active:scale-95">
+        <i class="fa-solid fa-trash"></i>
+        <span>Ya, Hapus</span>
+      </button>
+    </div>
+  </div>
+</div>
