@@ -8,12 +8,11 @@
   // Konfigurasi Sesi & Batas Waktu Tidak Aktif (5 Menit)
   var SESSION_STORAGE_KEY = 'wargakoe_user_session';
   var LAST_ACTIVITY_KEY = 'wargakoe_last_activity';
-  var SESSION_TIMEOUT_MS = 5 * 60 * 1000; // 5 Menit dalam milidetik
+  var SESSION_TIMEOUT_MS = 5 * 60 * 1000;
   var inactivityIntervalId = null;
   var lastThrottleTime = 0;
 
   window.onload = function() {
-    // 1. Inisialisasi filter bulan dan tahun berjalan
     var dateNow = new Date();
     var months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
     var currentMonthStr = months[dateNow.getMonth()];
@@ -28,7 +27,6 @@
     var kYear = document.getElementById('kasRtFilterTahun');
     if (kYear) kYear.value = currentYearStr;
 
-    // 2. Periksa status sesi pengguna secara instan
     checkInitialAuth();
   };
 
@@ -36,9 +34,7 @@
     var splash = document.getElementById('splashScreen');
     var savedSession = getValidStoredSession();
 
-    // JIKA USER SUDAH LOGIN & SESI MASIH VALID (< 5 MENIT)
     if (savedSession) {
-      // Langsung sembunyikan splash screen seketika tanpa animasi tunggu
       if (splash) {
         splash.style.display = 'none';
         splash.classList.add('hidden');
@@ -52,13 +48,11 @@
       return;
     }
 
-    // JIKA SESI KEDALUWARSA ATAU PENGGUNA BELUM LOGIN
     var wasExpired = isSessionExpired();
     if (wasExpired) {
       clearStoredSession();
     }
 
-    // Tampilkan animasi splash screen secara normal (1.5 detik) khusus saat belum login
     setTimeout(function() {
       if (splash) {
         splash.classList.add('opacity-0');
@@ -136,7 +130,6 @@
 
   function recordUserActivity() {
     var now = Date.now();
-    // Throttling: perbarui timestamp aktivitas maksimal sekali setiap 5 detik agar performa tetap optimal
     if (now - lastThrottleTime > 5000) {
       lastThrottleTime = now;
       if (currentUser) {
@@ -153,7 +146,6 @@
       window.addEventListener(events[i], recordUserActivity, { passive: true });
     }
 
-    // Pengecekan latar belakang setiap 10 detik apakah pengguna sudah diam lebih dari 5 menit
     inactivityIntervalId = setInterval(function() {
       if (!currentUser) return;
 
@@ -263,6 +255,8 @@
         currentUser = {
           noKk: '3171010000000001',
           nama: 'Budi Santoso',
+          noKtp: '3171010101850001',
+          noHp: '081234567890',
           role: 'Super Admin',
           statusUser: 'Pengurus RT',
           alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010 RW 05 Halim'
@@ -340,7 +334,14 @@
       document.getElementById('userAvatarDesktop').innerText = (currentUser.nama || 'U').charAt(0).toUpperCase();
       document.getElementById('welcomeBannerText').innerText = 'Halo, ' + currentUser.nama + '!';
 
-      var isPengurus = (currentUser.role === 'Super Admin' || currentUser.statusUser === 'Pengurus RT' || currentUser.role === 'Pengurus RT' || currentUser.role === 'Ketua RT' || currentUser.role === 'Bendahara' || currentUser.role === 'Sekretaris');
+      var isPengurus = (
+        currentUser.role === 'Super Admin' ||
+        currentUser.statusUser === 'Pengurus RT' ||
+        currentUser.role === 'Pengurus RT' ||
+        currentUser.role === 'Ketua RT' ||
+        currentUser.role === 'Bendahara' ||
+        currentUser.role === 'Sekretaris'
+      );
 
       var btnPengeluaranContainer = document.getElementById('btnPengeluaranRutinContainer');
       if (btnPengeluaranContainer) {
@@ -356,7 +357,7 @@
 
       var btnImportContainer = document.getElementById('btnImportWargaContainer');
       if (btnImportContainer) {
-        if (currentUser.role === 'Super Admin') btnImportContainer.classList.remove('hidden');
+        if (isPengurus) btnImportContainer.classList.remove('hidden');
         else btnImportContainer.classList.add('hidden');
       }
 
@@ -375,11 +376,31 @@
 
     switchTab('dashboard');
     refreshData();
+
+    if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.getPengaduanPendingCount) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success && typeof updatePengaduanRedDotBadges === 'function') {
+            updatePengaduanRedDotBadges(res.pendingCount || 0);
+          }
+        })
+        .getPengaduanPendingCount();
+    }
+
+    if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.getSuratPendingCount) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success && typeof updateSuratPendingBadges === 'function') {
+            updateSuratPendingBadges(res.pendingCount || 0);
+          }
+        })
+        .getSuratPendingCount();
+    }
   }
 
   function switchTab(tabId) {
     currentTab = tabId;
-    var tabs = ['dashboard', 'warga', 'iuran', 'keluarga', 'mading', 'aset', 'ronda'];
+    var tabs = ['dashboard', 'warga', 'iuran', 'keluarga', 'mading', 'aset', 'ronda', 'pengaduan', 'surat'];
     for (var i = 0; i < tabs.length; i++) {
       var t = tabs[i];
       var view = document.getElementById('tab-' + t);
@@ -397,43 +418,96 @@
     var gBanner = document.getElementById('greetingBanner');
     if (gBanner) {
       if (tabId === 'dashboard') {
-        gBanner.className = 'mb-5 rounded-3xl p-5 sm:p-6 bg-gradient-to-r from-brand-amber via-brand-pink to-brand-indigo text-white shadow-xl relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4';
+        gBanner.className = 'mb-3.5 sm:mb-5 rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 bg-gradient-to-r from-brand-amber via-brand-pink to-brand-indigo text-white shadow-xl relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-4';
       } else {
-        gBanner.className = 'mb-5 rounded-3xl p-5 sm:p-6 bg-gradient-to-r from-brand-amber via-brand-pink to-brand-indigo text-white shadow-xl relative overflow-hidden hidden md:flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4';
+        gBanner.className = 'mb-3.5 sm:mb-5 rounded-2xl sm:rounded-3xl p-3.5 sm:p-6 bg-gradient-to-r from-brand-amber via-brand-pink to-brand-indigo text-white shadow-xl relative overflow-hidden hidden md:flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-4';
       }
     }
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
+    // Router pemanggilan loader tab yang aman dan presisi
     if (tabId === 'warga') {
-      fetchWargaData(0);
+      if (typeof fetchWargaData === 'function') fetchWargaData(0);
+      else if (typeof loadWargaData === 'function') loadWargaData();
     } else if (tabId === 'iuran') {
-      fetchIuranData(0);
-      fetchKasRtDetails();
+      if (typeof fetchIuranData === 'function') fetchIuranData(0);
+      if (typeof fetchKasRtDetails === 'function') fetchKasRtDetails();
     } else if (tabId === 'keluarga') {
-      fetchFamilyData();
+      if (typeof fetchFamilyData === 'function') fetchFamilyData();
+      else if (typeof loadFamilyData === 'function') loadFamilyData();
     } else if (tabId === 'mading') {
-      fetchMadingData();
+      if (typeof fetchMadingData === 'function') fetchMadingData();
     } else if (tabId === 'dashboard') {
       refreshData();
     } else if (tabId === 'aset') {
-      fetchAsetData();
-      fetchPeminjamanData();
+      if (typeof fetchAsetData === 'function') fetchAsetData();
+      if (typeof fetchPeminjamanData === 'function') fetchPeminjamanData();
     } else if (tabId === 'ronda') {
+      if (typeof fetchRondaSchedules === 'function') fetchRondaSchedules();
+    } else if (tabId === 'pengaduan') {
+      if (typeof fetchPengaduanData === 'function') fetchPengaduanData(0);
+    } else if (tabId === 'surat') {
+      if (typeof fetchSuratData === 'function') fetchSuratData(0);
+    }
+  }
+
+  function refreshData() {
+    // 1. Ambil ringkasan statistik dari backend
+    if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.getDashboardData) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success) {
+            // Update 4 Kartu Statistik
+            var sWarga = document.getElementById('statTotalWarga');
+            var sKk = document.getElementById('statTotalKk');
+            var sKas = document.getElementById('statKasTerkumpul');
+            var sMenunggu = document.getElementById('statMenungguApproval');
+
+            if (sWarga) sWarga.innerText = res.totalWarga || 0;
+            if (sKk) sKk.innerText = res.totalKk || 0;
+            if (sKas) sKas.innerText = formatRupiah(res.kasTerkumpul || 0);
+            if (sMenunggu) sMenunggu.innerText = res.menungguApproval || 0;
+
+            // Render Pengumuman Mading Terkini di Dashboard
+            if (typeof renderDashboardRecentMading === 'function') {
+              renderDashboardRecentMading(res.recentMading || []);
+            }
+
+            // Render Highlight Jadwal Ronda di Dashboard
+            if (typeof renderDashboardRondaHighlight === 'function') {
+              renderDashboardRondaHighlight(res.activeRonda);
+            }
+          }
+        })
+        .withFailureHandler(function(err) {
+          console.warn('Fallback refresh dashboard:', err);
+        })
+        .getDashboardData();
+    }
+
+    // 2. Pastikan kedua card dashboard langsung memuat datanya secara pasti
+    if (typeof fetchMadingData === 'function') {
+      fetchMadingData();
+    }
+    if (typeof fetchRondaSchedules === 'function') {
       fetchRondaSchedules();
     }
   }
 
   function renderPaginationButtons(containerId, currentPage, totalPages, fetchFnName) {
     var container = document.getElementById(containerId);
+    if (!container) return;
     container.innerHTML = '';
     if (totalPages <= 1) return;
+
     var prevBtn = document.createElement('button');
     prevBtn.className = 'px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 disabled:opacity-40';
     prevBtn.disabled = currentPage <= 1;
     prevBtn.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
     prevBtn.onclick = function() { window[fetchFnName]((currentPage - 2) * 10); };
     container.appendChild(prevBtn);
+
     var nextBtn = document.createElement('button');
     nextBtn.className = 'px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 disabled:opacity-40';
     nextBtn.disabled = currentPage >= totalPages;
@@ -486,4 +560,6 @@
     var number = parseInt(val, 10) || 0;
     return 'Rp ' + number.toLocaleString('id-ID');
   }
+
+  window.refreshData = refreshData;
 </script>
