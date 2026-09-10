@@ -1,0 +1,686 @@
+<script>
+  var currentPengaduanList = [];
+  var uploadedAduanPhotoBase64 = '';
+  var debounceTimerAduan = null;
+
+  function debounceFetchPengaduan() {
+    if (debounceTimerAduan) clearTimeout(debounceTimerAduan);
+    debounceTimerAduan = setTimeout(function() {
+      fetchPengaduanData(0);
+    }, 350);
+  }
+
+  function fetchPengaduanData(offset) {
+    var container = document.getElementById('pengaduanCardsContainer');
+    if (container) {
+      container.innerHTML = '<div class="col-span-full p-8 text-center text-slate-400 text-xs"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Memuat daftar pengaduan warga...</div>';
+    }
+
+    var searchVal = document.getElementById('filterAduanSearch') ? document.getElementById('filterAduanSearch').value : '';
+    var katVal = document.getElementById('filterAduanKategori') ? document.getElementById('filterAduanKategori').value : 'SEMUA';
+    var statusVal = document.getElementById('filterAduanStatus') ? document.getElementById('filterAduanStatus').value : 'SEMUA';
+    var onlyMine = document.getElementById('filterAduanOnlyMine') ? document.getElementById('filterAduanOnlyMine').checked : false;
+
+    var params = {
+      search: searchVal,
+      kategori: katVal,
+      status: statusVal,
+      onlyMine: onlyMine,
+      userNoKk: currentUser ? currentUser.noKk : '',
+      userRole: currentUser ? currentUser.role : 'Warga'
+    };
+
+    if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.getPengaduanList) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success) {
+            currentPengaduanList = res.data || [];
+            renderPengaduanCards(currentPengaduanList);
+            updatePengaduanCounters(currentPengaduanList, res.pendingCount || 0);
+          } else {
+            if (container) container.innerHTML = '<div class="col-span-full p-6 text-center text-rose-500 text-xs">Gagal memuat aduan.</div>';
+          }
+        })
+        .withFailureHandler(function(err) {
+          if (container) container.innerHTML = '<div class="col-span-full p-6 text-center text-rose-500 text-xs">Kesalahan server: ' + err.toString() + '</div>';
+        })
+        .getPengaduanList(params);
+    } else {
+      /* Fallback demo mode */
+      setTimeout(function() {
+        var dummy = [
+          {
+            idPengaduan: 'ADU-0001',
+            noKk: '3171010000000003',
+            namaPelapor: 'Agus Setiawan',
+            noHp: '081234567892',
+            kategori: 'Fasilitas Umum & Lampu Jalan',
+            judulAduan: 'Lampu Penerangan Gang 2 Mati Total',
+            lokasi: 'Depan Tiang No. 04 Gang 2 RT 010',
+            deskripsi: 'Lampu penerangan sudah mati sejak 2 malam lalu, kondisi gang gelap dan rawan saat malam hari.',
+            fotoBukti: '',
+            status: 'Menunggu',
+            catatanPengurus: '-',
+            petugasPenangan: '-',
+            createdAt: '07/09/2026 14:30:00',
+            updatedAt: '07/09/2026 14:30:00'
+          },
+          {
+            idPengaduan: 'ADU-0002',
+            noKk: '3171010000000004',
+            namaPelapor: 'Haji Abdullah',
+            noHp: '081234567893',
+            kategori: 'Air Bersih & PAM',
+            judulAduan: 'Pipa Sambungan PAM Bocor Menggenangi Jalan',
+            lokasi: 'Perempatan Pos Ronda Gang Utama',
+            deskripsi: 'Air merembes deras keluar dari pipa aspal, aspal jadi licin dan becek.',
+            fotoBukti: '',
+            status: 'Selesai',
+            catatanPengurus: 'Sudah diperbaiki teknisi PAM Halim dan aliran air normal kembali.',
+            petugasPenangan: 'Teknisi PAM & Pengurus RT',
+            createdAt: '06/09/2026 09:15:00',
+            updatedAt: '07/09/2026 10:00:00'
+          }
+        ];
+        currentPengaduanList = dummy;
+        renderPengaduanCards(currentPengaduanList);
+        updatePengaduanCounters(currentPengaduanList, 1);
+      }, 350);
+    }
+  }
+
+  function renderPengaduanCards(list) {
+    var container = document.getElementById('pengaduanCardsContainer');
+    if (!container) return;
+    container.innerHTML = '';
+
+    if (!list || list.length === 0) {
+      container.innerHTML = 
+        '<div class="col-span-full p-10 text-center bg-white rounded-3xl border border-dashed border-slate-200 text-slate-400 text-xs">' +
+          '<div class="w-12 h-12 mx-auto rounded-2xl bg-slate-100 flex items-center justify-center text-lg text-slate-400 mb-2">' +
+            '<i class="fa-solid fa-clipboard-check"></i>' +
+          '</div>' +
+          '<p class="font-bold text-slate-700">Tidak ada pengaduan ditemukan</p>' +
+          '<p class="text-[11px] text-slate-400 mt-1">Belum ada aduan warga untuk filter yang dipilih saat ini.</p>' +
+        '</div>';
+      return;
+    }
+
+    var isPengurus = currentUser && (
+      currentUser.role === 'Super Admin' ||
+      currentUser.statusUser === 'Pengurus RT' ||
+      currentUser.role === 'Pengurus RT' ||
+      currentUser.role === 'Ketua RT' ||
+      currentUser.role === 'Bendahara' ||
+      currentUser.role === 'Sekretaris'
+    );
+
+    for (var i = 0; i < list.length; i++) {
+      var item = list[i];
+      var card = document.createElement('div');
+      card.className = 'dashboard-card p-5 bg-white border border-slate-200 flex flex-col justify-between hover:shadow-md transition relative';
+
+      /* Styling badge status */
+      var statusBadge = '';
+      var sLower = String(item.status || '').toLowerCase().trim();
+
+      if (sLower === 'menunggu') {
+        statusBadge = '<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span><span>Menunggu Verifikasi</span></span>';
+      } else if (sLower === 'diterima') {
+        statusBadge = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-200"><i class="fa-solid fa-inbox text-[9px]"></i><span>Laporan Diterima</span></span>';
+      } else if (sLower === 'dalam perbaikan') {
+        statusBadge = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200"><i class="fa-solid fa-screwdriver-wrench text-[9px]"></i><span>Dalam Perbaikan</span></span>';
+      } else if (sLower === 'selesai') {
+        statusBadge = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200"><i class="fa-solid fa-circle-check text-[9px]"></i><span>Sudah Diperbaiki</span></span>';
+      } else {
+        statusBadge = '<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200"><i class="fa-solid fa-circle-xmark text-[9px]"></i><span>Ditolak</span></span>';
+      }
+
+      /* Photo preview thumbnail */
+      var photoHtml = '';
+      if (item.fotoBukti && item.fotoBukti.indexOf('data:image') === 0) {
+        photoHtml = 
+          '<div class="mt-3 relative w-full h-36 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 cursor-pointer group" onclick="openModalFotoPengaduan(\'' + encodeURIComponent(item.fotoBukti) + '\', \'' + encodeURIComponent(item.judulAduan) + '\')">' +
+            '<img src="' + item.fotoBukti + '" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">' +
+            '<div class="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1.5">' +
+              '<i class="fa-solid fa-magnifying-glass-plus"></i><span>Perbesar Foto</span>' +
+            '</div>' +
+          '</div>';
+      }
+
+      /* Response notes preview */
+      var responseHtml = '';
+      if (item.catatanPengurus && item.catatanPengurus !== '-') {
+        responseHtml = 
+          '<div class="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 text-[11px] leading-relaxed">' +
+            '<div class="flex items-center justify-between text-indigo-700 font-bold mb-1">' +
+              '<span class="flex items-center gap-1"><i class="fa-solid fa-comment-dots"></i><span>Tanggapan Pengurus:</span></span>' +
+              '<span class="text-[9px] text-slate-400 font-normal font-mono">' + (item.petugasPenangan || 'Pengurus') + '</span>' +
+            '</div>' +
+            '<p class="italic text-slate-600 line-clamp-2">"' + item.catatanPengurus + '"</p>' +
+          '</div>';
+      }
+
+      var actionButtonsHtml = '';
+      if (sLower === 'selesai') {
+        // Status Selesai: Pengurus TIDAK BISA update mundur lagi. Muncul tombol Hapus bagi Pengurus RT.
+        actionButtonsHtml = 
+          '<div class="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2">' +
+            '<button type="button" onclick="openModalDetailPengaduan(\'' + item.idPengaduan + '\')" class="flex-1 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition flex items-center justify-center gap-1.5 active:scale-95" title="Lihat detail lengkap laporan">' +
+              '<i class="fa-solid fa-eye text-sky-600"></i>' +
+              '<span>Lihat Detail</span>' +
+            '</button>' +
+            (isPengurus ? 
+              '<button type="button" onclick="confirmDeletePengaduan(\'' + item.idPengaduan + '\', \'' + encodeURIComponent(item.judulAduan) + '\')" class="py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs border border-rose-200 transition flex items-center justify-center gap-1.5 active:scale-95" title="Hapus laporan yang sudah selesai">' +
+                '<i class="fa-solid fa-trash-can"></i>' +
+                '<span>Hapus</span>' +
+              '</button>' : '') +
+          '</div>';
+      } else {
+        // Status belum Selesai: Pengurus bisa Tindak Lanjut untuk memproses/menyelesaikan laporan
+        actionButtonsHtml = 
+          '<div class="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2">' +
+            '<button type="button" onclick="openModalDetailPengaduan(\'' + item.idPengaduan + '\')" class="flex-1 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition flex items-center justify-center gap-1.5 active:scale-95" title="Lihat detail lengkap laporan">' +
+              '<i class="fa-solid fa-eye text-sky-600"></i>' +
+              '<span>Lihat Detail</span>' +
+            '</button>' +
+            (isPengurus ? 
+              '<button type="button" onclick="openModalAksiPengaduan(\'' + item.idPengaduan + '\', \'' + encodeURIComponent(item.judulAduan) + '\', \'' + encodeURIComponent(item.namaPelapor) + '\', \'' + item.status + '\', \'' + encodeURIComponent(item.catatanPengurus === '-' ? '' : item.catatanPengurus) + '\', \'' + encodeURIComponent(item.petugasPenangan === '-' ? '' : item.petugasPenangan) + '\')" class="flex-1 py-2 px-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs border border-indigo-200 transition flex items-center justify-center gap-1.5 active:scale-95" title="Tindak lanjut atau ubah status">' +
+                '<i class="fa-solid fa-screwdriver-wrench"></i>' +
+                '<span>Tindak Lanjut</span>' +
+              '</button>' : '') +
+          '</div>';
+      }
+
+      /* Category icon */
+      var katIcon = 'fa-triangle-exclamation text-amber-500';
+      if (item.kategori.indexOf('Lampu') !== -1) katIcon = 'fa-lightbulb text-yellow-500';
+      else if (item.kategori.indexOf('Air') !== -1) katIcon = 'fa-droplet text-sky-500';
+      else if (item.kategori.indexOf('Jalan') !== -1) katIcon = 'fa-road text-slate-600';
+      else if (item.kategori.indexOf('Sampah') !== -1) katIcon = 'fa-trash-can text-amber-600';
+      else if (item.kategori.indexOf('Keamanan') !== -1) katIcon = 'fa-shield-halved text-rose-500';
+
+      card.innerHTML = 
+        '<div>' +
+          '<div class="flex items-center justify-between gap-2 mb-2">' +
+            '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">' +
+              '<i class="fa-solid ' + katIcon + ' text-[10px]"></i>' +
+              '<span>' + item.kategori + '</span>' +
+            '</span>' +
+            statusBadge +
+          '</div>' +
+
+          '<h4 class="text-sm font-bold text-slate-900 leading-snug mt-1 mb-1">' + item.judulAduan + '</h4>' +
+          '<p class="text-[11px] text-slate-600 leading-relaxed line-clamp-2">' + item.deskripsi + '</p>' +
+          
+          photoHtml +
+
+          '<div class="mt-3 pt-2.5 border-t border-slate-100 space-y-1 text-[10px] text-slate-500">' +
+            '<div class="flex items-center gap-1 text-slate-600"><i class="fa-solid fa-location-dot text-rose-500 w-3.5 text-center"></i><span class="font-medium truncate">' + item.lokasi + '</span></div>' +
+            '<div class="flex items-center justify-between text-slate-400">' +
+              '<span><i class="fa-solid fa-user text-slate-400 mr-1"></i>' + item.namaPelapor + '</span>' +
+              '<span><i class="fa-solid fa-calendar mr-1"></i>' + item.createdAt + '</span>' +
+            '</div>' +
+          '</div>' +
+
+          responseHtml +
+        '</div>' +
+        actionButtonsHtml;
+
+      container.appendChild(card);
+    }
+  }
+
+  function openModalDetailPengaduan(idPengaduan) {
+    var item = null;
+    for (var i = 0; i < currentPengaduanList.length; i++) {
+      if (currentPengaduanList[i].idPengaduan === idPengaduan) {
+        item = currentPengaduanList[i];
+        break;
+      }
+    }
+
+    if (!item) {
+      showToast('Data pengaduan tidak ditemukan!', 'error');
+      return;
+    }
+
+    var elId = document.getElementById('detailAduanId');
+    var elKat = document.getElementById('detailAduanKatText');
+    var elJudul = document.getElementById('detailAduanJudul');
+    var elLokasi = document.getElementById('detailAduanLokasi');
+    var elDesk = document.getElementById('detailAduanDeskripsi');
+    var elPelapor = document.getElementById('detailAduanPelapor');
+    var elHp = document.getElementById('detailAduanHp');
+    var elCreated = document.getElementById('detailAduanCreatedAt');
+
+    if (elId) elId.innerText = 'ID: ' + item.idPengaduan;
+    if (elKat) elKat.innerText = item.kategori || 'Fasilitas Umum';
+    if (elJudul) elJudul.innerText = item.judulAduan || '-';
+    if (elLokasi) elLokasi.innerText = item.lokasi || '-';
+    if (elDesk) elDesk.innerText = item.deskripsi || '-';
+    if (elPelapor) elPelapor.innerText = item.namaPelapor || 'Warga RT 010';
+    if (elHp) elHp.innerText = (item.noHp && item.noHp !== '-') ? ('(No. HP: ' + item.noHp + ')') : '';
+    if (elCreated) elCreated.innerText = item.createdAt || '-';
+
+    /* Status badge in detail modal */
+    var elStatusContainer = document.getElementById('detailAduanStatusBadge');
+    var sLower = String(item.status || '').toLowerCase().trim();
+
+    if (elStatusContainer) {
+      if (sLower === 'menunggu') {
+        elStatusContainer.innerHTML = '<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200"><span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span><span>Menunggu Verifikasi</span></span>';
+      } else if (sLower === 'diterima') {
+        elStatusContainer.innerHTML = '<span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-sky-100 text-sky-800 border border-sky-200"><i class="fa-solid fa-inbox text-xs mr-1"></i>Laporan Diterima</span>';
+      } else if (sLower === 'dalam perbaikan') {
+        elStatusContainer.innerHTML = '<span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800 border border-purple-200"><i class="fa-solid fa-screwdriver-wrench text-xs mr-1"></i>Dalam Perbaikan</span>';
+      } else if (sLower === 'selesai') {
+        elStatusContainer.innerHTML = '<span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200"><i class="fa-solid fa-circle-check text-xs mr-1"></i>Sudah Diperbaiki</span>';
+      } else {
+        elStatusContainer.innerHTML = '<span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200"><i class="fa-solid fa-circle-xmark text-xs mr-1"></i>Ditolak</span>';
+      }
+    }
+
+    /* Photo Proof Section */
+    var photoBox = document.getElementById('detailAduanPhotoContainer');
+    var photoImg = document.getElementById('detailAduanPhotoImg');
+    var photoArea = document.getElementById('detailAduanPhotoClickArea');
+
+    if (item.fotoBukti && item.fotoBukti.indexOf('data:image') === 0) {
+      if (photoImg) photoImg.src = item.fotoBukti;
+      if (photoArea) {
+        photoArea.onclick = function() {
+          openModalFotoPengaduan(encodeURIComponent(item.fotoBukti), encodeURIComponent(item.judulAduan));
+        };
+      }
+      if (photoBox) photoBox.classList.remove('hidden');
+    } else {
+      if (photoBox) photoBox.classList.add('hidden');
+    }
+
+    /* Response / Notes Section */
+    var respBox = document.getElementById('detailAduanResponseContainer');
+    var respCat = document.getElementById('detailAduanCatatan');
+    var respPet = document.getElementById('detailAduanPetugas');
+
+    if (item.catatanPengurus && item.catatanPengurus !== '-') {
+      if (respCat) respCat.innerText = item.catatanPengurus;
+      if (respPet) respPet.innerText = 'Ditangani: ' + (item.petugasPenangan || 'Pengurus RT 010');
+      if (respBox) respBox.classList.remove('hidden');
+    } else {
+      if (respBox) respBox.classList.add('hidden');
+    }
+
+    var isPengurus = currentUser && (
+      currentUser.role === 'Super Admin' ||
+      currentUser.statusUser === 'Pengurus RT' ||
+      currentUser.role === 'Pengurus RT' ||
+      currentUser.role === 'Ketua RT' ||
+      currentUser.role === 'Bendahara' ||
+      currentUser.role === 'Sekretaris'
+    );
+
+    var btnAksi = document.getElementById('btnDetailAksiPengurus');
+    var btnHapus = document.getElementById('btnDetailHapusPengurus');
+
+    // Jika pengurus dan belum selesai: tampilkan Tindak Lanjut
+    if (btnAksi) {
+      if (isPengurus && sLower !== 'selesai') {
+        btnAksi.classList.remove('hidden');
+        btnAksi.onclick = function() {
+          closeModal('modalDetailPengaduan');
+          openModalAksiPengaduan(
+            item.idPengaduan,
+            encodeURIComponent(item.judulAduan),
+            encodeURIComponent(item.namaPelapor),
+            item.status,
+            encodeURIComponent(item.catatanPengurus === '-' ? '' : item.catatanPengurus),
+            encodeURIComponent(item.petugasPenangan === '-' ? '' : item.petugasPenangan)
+          );
+        };
+      } else {
+        btnAksi.classList.add('hidden');
+      }
+    }
+
+    // Jika pengurus dan sudah selesai: kunci tindakan & tampilkan tombol Hapus
+    if (btnHapus) {
+      if (isPengurus && sLower === 'selesai') {
+        btnHapus.classList.remove('hidden');
+        btnHapus.onclick = function() {
+          closeModal('modalDetailPengaduan');
+          confirmDeletePengaduan(item.idPengaduan, encodeURIComponent(item.judulAduan));
+        };
+      } else {
+        btnHapus.classList.add('hidden');
+      }
+    }
+
+    var modal = document.getElementById('modalDetailPengaduan');
+    if (modal) modal.classList.remove('hidden');
+  }
+
+  function confirmDeletePengaduan(idPengaduan, judulEnc) {
+    var judul = decodeURIComponent(judulEnc || 'Laporan Pengaduan');
+    var elId = document.getElementById('konfirmasiHapusAduanId');
+    var elTxt = document.getElementById('konfirmasiHapusAduanText');
+    if (elId) elId.value = idPengaduan;
+    if (elTxt) elTxt.innerHTML = 'Apakah Anda yakin ingin menghapus laporan <strong>"' + judul + '"</strong> (ID: ' + idPengaduan + ')? Data akan dihapus permanen dari sistem.';
+
+    var modal = document.getElementById('modalKonfirmasiHapusAduan');
+    if (modal) modal.classList.remove('hidden');
+  }
+
+  function executeDeletePengaduan() {
+    var elId = document.getElementById('konfirmasiHapusAduanId');
+    var idPengaduan = elId ? elId.value : '';
+    if (!idPengaduan) return;
+
+    var btn = document.getElementById('btnKonfirmasiHapusAduan');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Menghapus...';
+    }
+
+    if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.deletePengaduan) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-trash mr-1"></i>Ya, Hapus';
+          }
+          closeModal('modalKonfirmasiHapusAduan');
+          if (res && res.success) {
+            showToast(res.message, 'success');
+            fetchPengaduanData(0);
+            refreshData();
+          } else {
+            showToast(res ? res.message : 'Gagal menghapus pengaduan.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-trash mr-1"></i>Ya, Hapus';
+          }
+          closeModal('modalKonfirmasiHapusAduan');
+          showToast('Kesalahan server: ' + err.toString(), 'error');
+        })
+        .deletePengaduan(idPengaduan);
+    } else {
+      setTimeout(function() {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-trash mr-1"></i>Ya, Hapus';
+        }
+        closeModal('modalKonfirmasiHapusAduan');
+        showToast('Pengaduan ' + idPengaduan + ' berhasil dihapus (Demo Mode).', 'success');
+        fetchPengaduanData(0);
+      }, 400);
+    }
+  }
+
+  function updatePengaduanCounters(list, pendingCountFromApi) {
+    var totalMenunggu = 0;
+    var totalDiterima = 0;
+    var totalPerbaikan = 0;
+    var totalSelesai = 0;
+
+    for (var i = 0; i < list.length; i++) {
+      var s = String(list[i].status || '').toLowerCase().trim();
+      if (s === 'menunggu') totalMenunggu++;
+      else if (s === 'diterima') totalDiterima++;
+      else if (s === 'dalam perbaikan') totalPerbaikan++;
+      else if (s === 'selesai') totalSelesai++;
+    }
+
+    var elWait = document.getElementById('countAduanMenunggu');
+    var elRec = document.getElementById('countAduanDiterima');
+    var elRep = document.getElementById('countAduanPerbaikan');
+    var elDone = document.getElementById('countAduanSelesai');
+    var elInfo = document.getElementById('pengaduanTotalInfo');
+
+    if (elWait) elWait.innerText = totalMenunggu;
+    if (elRec) elRec.innerText = totalDiterima;
+    if (elRep) elRep.innerText = totalPerbaikan;
+    if (elDone) elDone.innerText = totalSelesai;
+    if (elInfo) elInfo.innerText = 'Menampilkan ' + list.length + ' pengaduan warga RT 010';
+
+    var effectivePending = pendingCountFromApi !== undefined ? pendingCountFromApi : totalMenunggu;
+    updatePengaduanRedDotBadges(effectivePending);
+  }
+
+  function updatePengaduanRedDotBadges(pendingCount) {
+    var isPengurus = currentUser && (
+      currentUser.role === 'Super Admin' ||
+      currentUser.statusUser === 'Pengurus RT' ||
+      currentUser.role === 'Pengurus RT' ||
+      currentUser.role === 'Ketua RT' ||
+      currentUser.role === 'Bendahara' ||
+      currentUser.role === 'Sekretaris'
+    );
+
+    var badgeDesk = document.getElementById('badgePengaduanPendingDesktop');
+    var badgeMob = document.getElementById('badgePengaduanPendingMobile');
+
+    if (isPengurus && pendingCount > 0) {
+      if (badgeDesk) badgeDesk.classList.remove('hidden');
+      if (badgeMob) badgeMob.classList.remove('hidden');
+    } else {
+      if (badgeDesk) badgeDesk.classList.add('hidden');
+      if (badgeMob) badgeMob.classList.add('hidden');
+    }
+  }
+
+  function handleAduanPhotoSelect(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var img = new Image();
+      img.onload = function() {
+        /* Kompresi gambar proporsional maksimal 600px dan kualitas 0.65 JPEG */
+        var canvas = document.createElement('canvas');
+        var maxDim = 600;
+        var width = img.width;
+        var height = img.height;
+
+        if (width > height && width > maxDim) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else if (height > maxDim) {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        uploadedAduanPhotoBase64 = canvas.toDataURL('image/jpeg', 0.65);
+
+        var previewBox = document.getElementById('aduanPhotoPreviewBox');
+        var previewImg = document.getElementById('aduanPhotoPreviewImg');
+        if (previewBox && previewImg) {
+          previewImg.src = uploadedAduanPhotoBase64;
+          previewBox.classList.remove('hidden');
+        }
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function clearAduanPhotoPreview() {
+    uploadedAduanPhotoBase64 = '';
+    var input = document.getElementById('aduanFileInput');
+    if (input) input.value = '';
+    var previewBox = document.getElementById('aduanPhotoPreviewBox');
+    if (previewBox) previewBox.classList.add('hidden');
+  }
+
+  function openModalBuatPengaduan() {
+    var elPelapor = document.getElementById('aduanNamaPelapor');
+    if (elPelapor) {
+      elPelapor.value = currentUser ? (currentUser.nama + ' (No. HP: ' + (currentUser.noHp || '-') + ')') : 'Warga RT 010';
+    }
+
+    var elJudul = document.getElementById('aduanJudul');
+    var elLokasi = document.getElementById('aduanLokasi');
+    var elDesk = document.getElementById('aduanDeskripsi');
+    var elKat = document.getElementById('aduanKategori');
+
+    if (elJudul) elJudul.value = '';
+    if (elLokasi) elLokasi.value = '';
+    if (elDesk) elDesk.value = '';
+    if (elKat) elKat.value = 'Fasilitas Umum & Lampu Jalan';
+
+    clearAduanPhotoPreview();
+
+    var modal = document.getElementById('modalBuatPengaduan');
+    if (modal) modal.classList.remove('hidden');
+  }
+
+  function handleSavePengaduan() {
+    var payload = {
+      noKk: currentUser ? currentUser.noKk : '',
+      namaPelapor: currentUser ? currentUser.nama : 'Warga RT 010',
+      noHp: currentUser ? currentUser.noHp : '-',
+      kategori: document.getElementById('aduanKategori').value,
+      judulAduan: document.getElementById('aduanJudul').value.trim(),
+      lokasi: document.getElementById('aduanLokasi').value.trim(),
+      deskripsi: document.getElementById('aduanDeskripsi').value.trim(),
+      fotoBukti: uploadedAduanPhotoBase64
+    };
+
+    var btn = document.getElementById('btnSubmitPengaduan');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Mengirim...';
+    }
+
+    if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.savePengaduan) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-1"></i>Kirim Laporan Pengaduan';
+          }
+          closeModal('modalBuatPengaduan');
+          if (res && res.success) {
+            showToast(res.message, 'success');
+            fetchPengaduanData(0);
+            refreshData();
+          } else {
+            showToast(res ? res.message : 'Gagal mengirim aduan.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-1"></i>Kirim Laporan Pengaduan';
+          }
+          showToast('Kesalahan server: ' + err.toString(), 'error');
+        })
+        .savePengaduan(payload);
+    } else {
+      setTimeout(function() {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-1"></i>Kirim Laporan Pengaduan';
+        }
+        closeModal('modalBuatPengaduan');
+        showToast('Pengaduan berhasil disampaikan (Demo Mode).', 'success');
+        fetchPengaduanData(0);
+      }, 400);
+    }
+  }
+
+  function openModalAksiPengaduan(idAduan, judulEnc, pelaporEnc, currentStatus, catatanEnc, petugasEnc) {
+    var elId = document.getElementById('aksiAduanId');
+    var elSub = document.getElementById('aksiAduanSubtitle');
+    var elJudul = document.getElementById('aksiAduanJudul');
+    var elPelapor = document.getElementById('aksiAduanPelapor');
+    var elStatus = document.getElementById('aksiAduanStatus');
+    var elCatatan = document.getElementById('aksiAduanCatatan');
+    var elPetugas = document.getElementById('aksiAduanPetugas');
+
+    if (elId) elId.value = idAduan;
+    if (elSub) elSub.innerText = 'ID: ' + idAduan;
+    if (elJudul) elJudul.innerText = decodeURIComponent(judulEnc || '-');
+    if (elPelapor) elPelapor.innerText = decodeURIComponent(pelaporEnc || '-');
+    if (elStatus) elStatus.value = currentStatus || 'Diterima';
+    if (elCatatan) elCatatan.value = decodeURIComponent(catatanEnc || '');
+    if (elPetugas) elPetugas.value = decodeURIComponent(petugasEnc || (currentUser ? currentUser.nama : 'Pengurus RT 010'));
+
+    var modal = document.getElementById('modalAksiPengaduan');
+    if (modal) modal.classList.remove('hidden');
+  }
+
+  function submitAksiPengaduan() {
+    var payload = {
+      idPengaduan: document.getElementById('aksiAduanId').value,
+      status: document.getElementById('aksiAduanStatus').value,
+      catatanPengurus: document.getElementById('aksiAduanCatatan').value.trim(),
+      petugasPenangan: document.getElementById('aksiAduanPetugas').value.trim()
+    };
+
+    var btn = document.getElementById('btnSubmitAksiAduan');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Menyimpan...';
+    }
+
+    if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.updateStatusPengaduan) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-check mr-1"></i>Simpan Tanggapan';
+          }
+          closeModal('modalAksiPengaduan');
+          if (res && res.success) {
+            showToast(res.message, 'success');
+            fetchPengaduanData(0);
+            refreshData();
+          } else {
+            showToast(res ? res.message : 'Gagal memperbarui.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-check mr-1"></i>Simpan Tanggapan';
+          }
+          showToast('Kesalahan server: ' + err.toString(), 'error');
+        })
+        .updateStatusPengaduan(payload);
+    } else {
+      setTimeout(function() {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-check mr-1"></i>Simpan Tanggapan';
+        }
+        closeModal('modalAksiPengaduan');
+        showToast('Tanggapan pengurus berhasil disimpan (Demo Mode).', 'success');
+        fetchPengaduanData(0);
+      }, 400);
+    }
+  }
+
+  function openModalFotoPengaduan(photoSrcEnc, judulEnc) {
+    var photoSrc = decodeURIComponent(photoSrcEnc || '');
+    var judul = decodeURIComponent(judulEnc || '-');
+
+    var img = document.getElementById('viewFotoAduanImg');
+    var lbl = document.getElementById('viewFotoAduanJudul');
+
+    if (img) img.src = photoSrc;
+    if (lbl) lbl.innerText = judul;
+
+    var modal = document.getElementById('modalFotoPengaduan');
+    if (modal) modal.classList.remove('hidden');
+  }
+</script>
