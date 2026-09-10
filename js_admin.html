@@ -1,0 +1,316 @@
+<script>
+  var stagedRestoreJsonContent = '';
+
+  // Background monitor: Menampilkan tombol Super Admin secara otomatis jika user adalah Super Admin
+  setInterval(function() {
+    if (typeof currentUser !== 'undefined' && currentUser && currentUser.role === 'Super Admin') {
+      var btnDesktop = document.getElementById('btnOpenSuperAdminDesktop');
+      var btnBanner = document.getElementById('btnOpenSuperAdminBanner');
+      if (btnDesktop && btnDesktop.classList.contains('hidden')) {
+        btnDesktop.classList.remove('hidden');
+      }
+      if (btnBanner && btnBanner.classList.contains('hidden')) {
+        btnBanner.classList.remove('hidden');
+      }
+    }
+  }, 400);
+
+  function openModalSuperAdmin() {
+    if (!currentUser || currentUser.role !== 'Super Admin') {
+      showToast('Akses ditolak! Fitur ini khusus untuk Super Admin.', 'error');
+      return;
+    }
+
+    // Reset input konfirmasi keamanan
+    var kwInput = document.getElementById('adminResetKeywordInput');
+    if (kwInput) kwInput.value = '';
+    validateAdminResetKeyword();
+
+    // Reset file restore staging
+    stagedRestoreJsonContent = '';
+    var fileInput = document.getElementById('adminRestoreFileInput');
+    if (fileInput) fileInput.value = '';
+    var fileInfo = document.getElementById('adminRestoreFileInfo');
+    if (fileInfo) fileInfo.classList.add('hidden');
+    var btnRestore = document.getElementById('btnAdminRestore');
+    if (btnRestore) {
+      btnRestore.disabled = true;
+      btnRestore.className = 'shrink-0 px-5 py-2.5 rounded-full bg-indigo-600 text-white font-bold text-xs shadow-md transition flex items-center justify-center gap-2 opacity-50 cursor-not-allowed';
+    }
+
+    // Default ke mode Checkbox Sheet dan uncheck semua demi keamanan
+    toggleAdminResetScope('SINGLE');
+    selectAllAdminResetSheets(false);
+
+    var modal = document.getElementById('modalSuperAdmin');
+    if (modal) modal.classList.remove('hidden');
+  }
+
+  function triggerAdminBackup() {
+    var btn = document.getElementById('btnAdminBackup');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Mengekspor...';
+    }
+
+    var payload = {
+      adminNoKk: currentUser ? currentUser.noKk : '',
+      adminNoHp: currentUser ? currentUser.noHp : '',
+      adminNama: currentUser ? currentUser.nama : 'Super Admin'
+    };
+
+    if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.backupDatabase) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-download mr-1"></i>Unduh File Backup';
+          }
+          if (res && res.success && res.backupJson) {
+            downloadJsonFile_(res.backupJson, res.filename || 'backup_wargakoe.json');
+            showToast('Backup database berhasil diunduh ke perangkat Anda!', 'success');
+          } else {
+            showToast(res ? res.message : 'Gagal membuat backup database.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-download mr-1"></i>Unduh File Backup';
+          }
+          showToast('Kesalahan server: ' + err.toString(), 'error');
+        })
+        .backupDatabase(payload);
+    } else {
+      // Demo fallback backup
+      setTimeout(function() {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-download mr-1"></i>Unduh File Backup';
+        }
+        var dummy = {
+          app: 'Wargakoe RT 010 (Demo Backup)',
+          exportedAt: new Date().toLocaleString(),
+          sheets: { USERS: { headers: ['No_KK', 'Nama'], rows: [] } }
+        };
+        downloadJsonFile_(JSON.stringify(dummy, null, 2), 'demo_backup_wargakoe.json');
+        showToast('Backup database demo berhasil diunduh!', 'success');
+      }, 500);
+    }
+  }
+
+  function downloadJsonFile_(jsonString, filename) {
+    var blob = new Blob([jsonString], { type: 'application/json;charset=utf-8;' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function handleAdminRestoreFileSelect(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+
+    var fileInfo = document.getElementById('adminRestoreFileInfo');
+    var btnRestore = document.getElementById('btnAdminRestore');
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        var content = e.target.result;
+        var parsed = JSON.parse(content);
+
+        if (!parsed.sheets) {
+          showToast('File JSON bukan berkas cadangan Wargakoe yang sah!', 'error');
+          stagedRestoreJsonContent = '';
+          if (fileInfo) fileInfo.classList.add('hidden');
+          if (btnRestore) {
+            btnRestore.disabled = true;
+            btnRestore.className = 'shrink-0 px-5 py-2.5 rounded-full bg-indigo-600 text-white font-bold text-xs shadow-md transition flex items-center justify-center gap-2 opacity-50 cursor-not-allowed';
+          }
+          return;
+        }
+
+        stagedRestoreJsonContent = content;
+        var count = Object.keys(parsed.sheets).length;
+
+        if (fileInfo) {
+          fileInfo.innerText = '✓ Berkas siap: ' + file.name + ' (' + count + ' sheet terdeteksi)';
+          fileInfo.classList.remove('hidden');
+        }
+
+        if (btnRestore) {
+          btnRestore.disabled = false;
+          btnRestore.className = 'shrink-0 px-5 py-2.5 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition flex items-center justify-center gap-2 active:scale-95 cursor-pointer';
+        }
+      } catch (err) {
+        showToast('Gagal membaca file JSON: ' + err.message, 'error');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function executeAdminRestore() {
+    if (!stagedRestoreJsonContent) {
+      showToast('Pilih file backup .json terlebih dahulu!', 'error');
+      return;
+    }
+
+    var btn = document.getElementById('btnAdminRestore');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Memulihkan...';
+    }
+
+    var payload = {
+      adminNoKk: currentUser ? currentUser.noKk : '',
+      adminNoHp: currentUser ? currentUser.noHp : '',
+      backupJsonStr: stagedRestoreJsonContent
+    };
+
+    if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.restoreDatabase) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-rotate-left mr-1"></i>Mulai Restore Data';
+          }
+          if (res && res.success) {
+            showToast(res.message, 'success');
+            closeModal('modalSuperAdmin');
+            if (typeof refreshData === 'function') refreshData();
+            setTimeout(function() { location.reload(); }, 1200);
+          } else {
+            showToast(res ? res.message : 'Gagal memulihkan database.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-rotate-left mr-1"></i>Mulai Restore Data';
+          }
+          showToast('Kesalahan server: ' + err.toString(), 'error');
+        })
+        .restoreDatabase(payload);
+    } else {
+      setTimeout(function() {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-rotate-left mr-1"></i>Mulai Restore Data';
+        }
+        showToast('Restore data berhasil diproses tanpa duplikasi (Demo Mode).', 'success');
+        closeModal('modalSuperAdmin');
+      }, 600);
+    }
+  }
+
+  function toggleAdminResetScope(scope) {
+    var container = document.getElementById('adminTargetSheetContainer');
+    if (!container) return;
+
+    if (scope === 'ALL') {
+      container.classList.add('hidden');
+    } else {
+      container.classList.remove('hidden');
+    }
+  }
+
+  function selectAllAdminResetSheets(isSelected) {
+    var checkboxes = document.querySelectorAll('.admin-reset-sheet-cb');
+    for (var i = 0; i < checkboxes.length; i++) {
+      checkboxes[i].checked = !!isSelected;
+    }
+  }
+
+  function validateAdminResetKeyword() {
+    var kwInput = document.getElementById('adminResetKeywordInput');
+    var btn = document.getElementById('btnExecuteAdminReset');
+    if (!kwInput || !btn) return;
+
+    var val = kwInput.value.trim();
+    if (val === 'RESET') {
+      btn.disabled = false;
+      btn.className = 'px-5 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-black text-xs shadow-lg transition flex items-center justify-center gap-2 active:scale-95 cursor-pointer';
+    } else {
+      btn.disabled = true;
+      btn.className = 'px-5 py-2.5 rounded-full bg-rose-600 text-white font-black text-xs shadow-md transition flex items-center justify-center gap-2 opacity-50 cursor-not-allowed';
+    }
+  }
+
+  function executeAdminReset() {
+    var kwInput = document.getElementById('adminResetKeywordInput');
+    if (!kwInput || kwInput.value.trim() !== 'RESET') {
+      showToast('Ketik teks "RESET" dengan huruf kapital untuk konfirmasi!', 'error');
+      return;
+    }
+
+    var scopeRadio = document.querySelector('input[name="adminResetScope"]:checked');
+    var mode = scopeRadio ? scopeRadio.value : 'SINGLE';
+    var targetSheets = [];
+
+    if (mode === 'SINGLE') {
+      var checkedBoxes = document.querySelectorAll('.admin-reset-sheet-cb:checked');
+      for (var i = 0; i < checkedBoxes.length; i++) {
+        targetSheets.push(checkedBoxes[i].value);
+      }
+
+      if (targetSheets.length === 0) {
+        showToast('Pilih minimal satu sheet yang ingin di-reset!', 'error');
+        return;
+      }
+    }
+
+    var btn = document.getElementById('btnExecuteAdminReset');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>Mereset...';
+    }
+
+    var payload = {
+      adminNoKk: currentUser ? currentUser.noKk : '',
+      adminNoHp: currentUser ? currentUser.noHp : '',
+      confirmKeyword: kwInput.value.trim(),
+      mode: mode,
+      targetSheets: targetSheets
+    };
+
+    if (typeof google !== 'undefined' && google.script && google.script.run && google.script.run.resetDatabase) {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-trash-can mr-1"></i>Eksekusi Reset Sekarang';
+          }
+          if (res && res.success) {
+            showToast(res.message, 'success');
+            closeModal('modalSuperAdmin');
+            if (typeof refreshData === 'function') refreshData();
+            setTimeout(function() { location.reload(); }, 1200);
+          } else {
+            showToast(res ? res.message : 'Gagal melakukan reset.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-trash-can mr-1"></i>Eksekusi Reset Sekarang';
+          }
+          showToast('Kesalahan server: ' + err.toString(), 'error');
+        })
+        .resetDatabase(payload);
+    } else {
+      setTimeout(function() {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-trash-can mr-1"></i>Eksekusi Reset Sekarang';
+        }
+        showToast('Reset ' + (mode === 'ALL' ? 'seluruh database' : targetSheets.join(', ')) + ' berhasil (Demo Mode).', 'success');
+        closeModal('modalSuperAdmin');
+      }, 500);
+    }
+  }
+</script>
