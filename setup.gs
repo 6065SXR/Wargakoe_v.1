@@ -142,6 +142,26 @@ var DB_SCHEMA = {
       'Foto_Selfie',
       'Created_At'
     ]
+  },
+  /* Menambahkan tabel Pengaduan Warga */
+  PENGADUAN: {
+    name: 'PENGADUAN',
+    headers: [
+      'ID_Pengaduan',
+      'No_KK',
+      'Nama_Pelapor',
+      'No_HP',
+      'Kategori',
+      'Judul_Aduan',
+      'Lokasi',
+      'Deskripsi',
+      'Foto_Bukti',
+      'Status',
+      'Catatan_Pengurus',
+      'Petugas_Penangan',
+      'Created_At',
+      'Updated_At'
+    ]
   }
 };
 
