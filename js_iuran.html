@@ -125,9 +125,9 @@
   }
 
   function fetchKasRtDetails() {
-    var curBadge = document.getElementById('kepatuhanPeriodeBadge');
-    var badgeText = curBadge ? curBadge.innerText.trim() : '';
-    var parts = badgeText.split(' ');
+    var lblPeriode = document.getElementById('currentMonthYearLabel');
+    var activePeriode = lblPeriode ? lblPeriode.innerText.trim() : 'September 2026';
+    var parts = activePeriode.split(' ');
     var bulan = parts[0] || 'September';
     var tahun = parts[1] || '2026';
 
@@ -135,114 +135,83 @@
       google.script.run
         .withSuccessHandler(function(res) {
           if (res && res.success && res.data) {
-            renderKeuanganRt3In1(res.data);
+            renderKeuanganDompetDanBuku(res.data);
           } else {
             console.warn('Gagal muat kas detail:', res ? res.message : 'Respon kosong');
           }
         })
         .withFailureHandler(function(err) {
           console.error('Kesalahan server getKasRtDetails:', err);
+          showToast('Kesalahan server saat memuat kas: ' + err.toString(), 'error');
         })
         .getKasRtDetails(bulan, tahun);
     } else {
       setTimeout(function() {
-        renderKeuanganRt3In1({
+        renderKeuanganDompetDanBuku({
           dompet: {
-            kasRt: { masuk: 400000, keluar: 50000, saldo: 350000 },
-            kasDuka: { masuk: 5000, keluar: 0, saldo: 5000 },
-            kasSampah: { masuk: 75000, keluar: 50000, saldo: 25000 },
-            kasSosial: { masuk: 180000, keluar: 0, saldo: 180000 }
-          },
-          kepatuhan: {
-            periode: 'September 2026',
-            totalKk: 8,
-            lunasKk: 6,
-            belumLunasCount: 2,
-            persentase: 75,
-            belumLunasList: [
-              { nama: 'Haji Abdullah', noKk: '3171010000000004', noHp: '081234567893', alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010' },
-              { nama: 'Agus Setiawan', noKk: '3171010000000003', noHp: '081234567892', alamat: 'Kamp. Baru I Jl. Marga Mulya RT 010' }
-            ]
+            kasRt: { saldoAwal: 0, masuk: 550000, keluar: 420000, arusBulanIni: 130000, saldo: 130000 },
+            kasDuka: { saldoAwal: 95000, masuk: 10000, keluar: 5000, arusBulanIni: 5000, saldo: 100000 },
+            kasSampah: { saldoAwal: 0, masuk: 550000, keluar: 510000, arusBulanIni: 40000, saldo: 40000 },
+            kasSosial: { saldoAwal: 15000, masuk: 15000, keluar: 0, arusBulanIni: 15000, saldo: 30000 }
           },
           pengeluaranList: [
-            { idKas: 'KAS-0022', tanggal: '02/09/2026', kategori: 'Iuran Sampah', keterangan: 'Gaji Komeng', nominal: 50000 },
-            { idKas: 'KAS-0021', tanggal: '02/09/2026', kategori: 'Iuran Kas', keterangan: 'Acara Rutin', nominal: 50000 },
-            { idKas: 'KAS-0019', tanggal: '02/09/2026', kategori: 'Kebersihan', keterangan: 'Kerja Bakti', nominal: 260000 },
-            { idKas: 'KAS-0004', tanggal: '12/08/2026', kategori: 'Fasilitas', keterangan: 'Perbaikan Lampu Jalan Gang Utama RT 05', nominal: 200000 },
-            { idKas: 'KAS-0003', tanggal: '05/08/2026', kategori: 'Kebersihan', keterangan: 'Pembelian Alat Kebersihan & Sapu Pos', nominal: 150000 }
+            { idKas: 'KAS-0022', tanggal: '02/09/2026', kategori: 'Iuran Sampah', keterangan: 'Honor Petugas Kebersihan', nominal: 50000 },
+            { idKas: 'KAS-0021', tanggal: '02/09/2026', kategori: 'Iuran Kas', keterangan: 'Konsumsi Rapat Warga RT 010', nominal: 50000 },
+            { idKas: 'KAS-0019', tanggal: '02/09/2026', kategori: 'Kebersihan', keterangan: 'Kerja Bakti Lingkungan', nominal: 260000 }
           ]
         });
       }, 300);
     }
   }
 
-  function renderKeuanganRt3In1(data) {
+  function renderKeuanganDompetDanBuku(data) {
     if (!data) return;
 
-    /* 1. Render Dompet 4 Pos Terpisah */
+    /* 1. Render Dompet 4 Pos: Saldo Awal Lalu, Arus Kas Bulan Ini, Masuk & Keluar, dan Sisa Saldo Akhir */
     if (data.dompet) {
       var d = data.dompet;
 
-      if (d.kasRt) {
-        setElText_('pocketKasRtSaldo', formatRupiahLocal_(d.kasRt.saldo));
-        setElText_('pocketKasRtMasuk', formatRupiahLocal_(d.kasRt.masuk));
-        setElText_('pocketKasRtKeluar', formatRupiahLocal_(d.kasRt.keluar));
-      }
+      var pocketList = [
+        { key: 'kasRt', prefix: 'pocketKasRt' },
+        { key: 'kasDuka', prefix: 'pocketKasDuka' },
+        { key: 'kasSampah', prefix: 'pocketKasSampah' },
+        { key: 'kasSosial', prefix: 'pocketKasSosial' }
+      ];
 
-      if (d.kasDuka) {
-        setElText_('pocketKasDukaSaldo', formatRupiahLocal_(d.kasDuka.saldo));
-        setElText_('pocketKasDukaMasuk', formatRupiahLocal_(d.kasDuka.masuk));
-        setElText_('pocketKasDukaKeluar', formatRupiahLocal_(d.kasDuka.keluar));
-      }
+      for (var p = 0; p < pocketList.length; p++) {
+        var item = pocketList[p];
+        var pocketData = d[item.key];
+        if (pocketData) {
+          // Total Sisa Saldo Kas Aktif
+          setElText_(item.prefix + 'Saldo', formatRupiahLocal_(pocketData.saldo || 0));
 
-      if (d.kasSampah) {
-        setElText_('pocketKasSampahSaldo', formatRupiahLocal_(d.kasSampah.saldo));
-        setElText_('pocketKasSampahMasuk', formatRupiahLocal_(d.kasSampah.masuk));
-        setElText_('pocketKasSampahKeluar', formatRupiahLocal_(d.kasSampah.keluar));
-      }
+          // Saldo Awal Bulan Lalu (Saldo Mengendap)
+          setElText_(item.prefix + 'SaldoAwal', formatRupiahLocal_(pocketData.saldoAwal || 0));
 
-      if (d.kasSosial) {
-        setElText_('pocketKasSosialSaldo', formatRupiahLocal_(d.kasSosial.saldo));
-        setElText_('pocketKasSosialMasuk', formatRupiahLocal_(d.kasSosial.masuk));
-        setElText_('pocketKasSosialKeluar', formatRupiahLocal_(d.kasSosial.keluar));
-      }
-    }
-
-    /* 2. Render Monitoring Kepatuhan KK */
-    if (data.kepatuhan) {
-      var kp = data.kepatuhan;
-      setElText_('kepatuhanPeriodeBadge', kp.periode || 'September 2026');
-      setElText_('kepatuhanKkText', (kp.lunasKk || 0) + ' dari ' + (kp.totalKk || 0) + ' KK Sudah Melunasi Iuran');
-      setElText_('kepatuhanPersenText', (kp.persentase || 0) + '% Terkumpul');
-      setElText_('kepatuhanBelumLunasCount', (kp.belumLunasCount || 0) + ' KK');
-
-      var bar = document.getElementById('kepatuhanProgressBar');
-      if (bar) bar.style.width = (kp.persentase || 0) + '%';
-
-      var listContainer = document.getElementById('daftarBelumLunasList');
-      if (listContainer) {
-        listContainer.innerHTML = '';
-        var bList = kp.belumLunasList || [];
-        if (bList.length === 0) {
-          listContainer.innerHTML = '<div class="col-span-full p-4 text-center text-emerald-700 bg-emerald-50 rounded-xl border border-emerald-200 text-xs font-bold"><i class="fa-solid fa-circle-check mr-1.5"></i>Seluruh Kepala Keluarga RT 010 sudah melunasi iuran bulan ini.</div>';
-        } else {
-          for (var b = 0; b < bList.length; b++) {
-            var itemKk = bList[b];
-            var cardKk = document.createElement('div');
-            cardKk.className = 'p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between shadow-xs';
-            cardKk.innerHTML = 
-              '<div class="overflow-hidden pr-2">' +
-                '<p class="font-bold text-xs text-slate-900 truncate">' + itemKk.nama + '</p>' +
-                '<p class="text-[10px] text-slate-500 font-mono truncate">KK: ' + itemKk.noKk + '</p>' +
-              '</div>' +
-              '<span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200 whitespace-nowrap">Belum Lunas</span>';
-            listContainer.appendChild(cardKk);
+          // Arus Kas Bersih Bulan Ini (Masuk dikurangi Keluar bulan ini)
+          var arusEl = document.getElementById(item.prefix + 'ArusBulanIni');
+          if (arusEl) {
+            var arusVal = pocketData.arusBulanIni !== undefined ? pocketData.arusBulanIni : ((pocketData.masuk || 0) - (pocketData.keluar || 0));
+            if (arusVal > 0) {
+              arusEl.className = 'font-bold font-mono text-emerald-600';
+              arusEl.innerText = '+ ' + formatRupiahLocal_(arusVal);
+            } else if (arusVal < 0) {
+              arusEl.className = 'font-bold font-mono text-rose-600';
+              arusEl.innerText = '- ' + formatRupiahLocal_(Math.abs(arusVal));
+            } else {
+              arusEl.className = 'font-bold font-mono text-slate-500';
+              arusEl.innerText = formatRupiahLocal_(0);
+            }
           }
+
+          // Rincian Masuk & Keluar Bulan Ini di sub-panel bawah
+          setElText_(item.prefix + 'Masuk', formatRupiahLocal_(pocketData.masuk || 0));
+          setElText_(item.prefix + 'Keluar', formatRupiahLocal_(pocketData.keluar || 0));
         }
       }
     }
 
-    /* 3. Render Buku Transparansi Pengeluaran RT */
+    /* 2. Render Buku Transparansi Pengeluaran & Belanja RT 010 */
     var tExpBody = document.getElementById('bukuPengeluaranTableBody');
     if (tExpBody) {
       tExpBody.innerHTML = '';
@@ -260,11 +229,17 @@
 
         var badgeColor = 'bg-slate-100 text-slate-800 border-slate-200';
         var kLower = String(exp.kategori || '').toLowerCase();
-        if (kLower.indexOf('sampah') !== -1) badgeColor = 'bg-amber-100 text-amber-800 border-amber-200';
-        else if (kLower.indexOf('kebersihan') !== -1) badgeColor = 'bg-teal-100 text-teal-800 border-teal-200';
-        else if (kLower.indexOf('fasilitas') !== -1) badgeColor = 'bg-indigo-100 text-indigo-800 border-indigo-200';
-        else if (kLower.indexOf('duka') !== -1) badgeColor = 'bg-purple-100 text-purple-800 border-purple-200';
-        else if (kLower.indexOf('kas') !== -1) badgeColor = 'bg-sky-100 text-sky-800 border-sky-200';
+        if (kLower.indexOf('sampah') !== -1 || kLower.indexOf('kebersihan') !== -1) {
+          badgeColor = 'bg-amber-100 text-amber-800 border-amber-200';
+        } else if (kLower.indexOf('fasilitas') !== -1) {
+          badgeColor = 'bg-indigo-100 text-indigo-800 border-indigo-200';
+        } else if (kLower.indexOf('duka') !== -1 || kLower.indexOf('kematian') !== -1) {
+          badgeColor = 'bg-purple-100 text-purple-800 border-purple-200';
+        } else if (kLower.indexOf('sosial') !== -1) {
+          badgeColor = 'bg-rose-100 text-rose-800 border-rose-200';
+        } else if (kLower.indexOf('kas') !== -1) {
+          badgeColor = 'bg-sky-100 text-sky-800 border-sky-200';
+        }
 
         tr.innerHTML = 
           '<td class="p-3.5 font-medium text-slate-600 whitespace-nowrap">' + (exp.tanggal || '-') + '</td>' +
@@ -281,6 +256,10 @@
     }
   }
 
+  function renderKeuanganRt3In1(data) {
+    renderKeuanganDompetDanBuku(data);
+  }
+
   function setElText_(id, txt) {
     var el = document.getElementById(id);
     if (el) el.innerText = txt;
@@ -290,20 +269,6 @@
     if (typeof formatRupiah === 'function') return formatRupiah(val);
     var number = parseInt(val, 10) || 0;
     return 'Rp ' + number.toLocaleString('id-ID');
-  }
-
-  function toggleDaftarBelumLunas() {
-    var box = document.getElementById('daftarBelumLunasContainer');
-    var btnText = document.getElementById('btnToggleBelumLunasText');
-    if (!box) return;
-
-    if (box.classList.contains('hidden')) {
-      box.classList.remove('hidden');
-      if (btnText) btnText.innerText = 'Sembunyikan Daftar';
-    } else {
-      box.classList.add('hidden');
-      if (btnText) btnText.innerText = 'Lihat Daftar KK';
-    }
   }
 
   function openModalBayarIuran() {
@@ -343,7 +308,7 @@
 
     if (jenis === 'Iuran Kas') elNom.value = '50000';
     else if (jenis === 'Iuran Duka') elNom.value = '20000';
-    else if (jenis === 'Iuran Sampah') elNom.value = '25000';
+    else if (jenis === 'Iuran Sampah' || jenis === 'Kebersihan') elNom.value = '25000';
     else if (jenis === 'Iuran Sosial') elNom.value = '15000';
     else elNom.value = '30000';
   }
