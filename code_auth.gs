@@ -5,6 +5,23 @@
  * ====================================================================
  */
 
+/**
+ * Helper normalisasi nomor HP:
+ * Mengubah variasi format (+628..., 628..., 08..., atau 8...) menjadi format standar 8xxxxxxxxx
+ * agar selalu cocok dengan data di Google Sheets.
+ */
+function normalizePhone_(phone) {
+  if (phone === undefined || phone === null) return '';
+  var clean = String(phone).replace(/[^0-9]/g, '');
+  if (clean.indexOf('62') === 0) {
+    clean = clean.substring(2);
+  }
+  while (clean.indexOf('0') === 0) {
+    clean = clean.substring(1);
+  }
+  return clean;
+}
+
 function loginUser(noHp, password) {
   try {
     if (!noHp || !password) {
@@ -20,10 +37,14 @@ function loginUser(noHp, password) {
     var headers = data[0];
     var hpIdx = headers.indexOf('No_HP');
     var passIdx = headers.indexOf('Password');
+    var inputHpNorm = normalizePhone_(noHp);
 
     for (var i = 1; i < data.length; i++) {
       var row = data[i];
-      if (row[hpIdx] === noHp.trim() && row[passIdx] === password.trim()) {
+      var rowHpNorm = normalizePhone_(row[hpIdx]);
+      
+      // Pencocokan nomor HP menggunakan format normalisasi (8xxxxxxxxx)
+      if (rowHpNorm === inputHpNorm && row[passIdx] === password.trim()) {
         var userObj = {
           noKk: row[headers.indexOf('No_KK')],
           noKtp: row[headers.indexOf('No_KTP')],
@@ -59,6 +80,7 @@ function registerUser(formData) {
     var kkIdx = headers.indexOf('No_KK');
     var ktpIdx = headers.indexOf('No_KTP');
     var hpIdx = headers.indexOf('No_HP');
+    var inputHpNorm = normalizePhone_(formData.noHp);
 
     for (var i = 1; i < data.length; i++) {
       if (data[i][kkIdx] === String(formData.noKk).trim()) {
@@ -67,7 +89,8 @@ function registerUser(formData) {
       if (data[i][ktpIdx] === String(formData.noKtp).trim()) {
         return { success: false, message: 'Nomor KTP sudah terdaftar di sistem!' };
       }
-      if (data[i][hpIdx] === String(formData.noHp).trim()) {
+      // Pengecekan duplikasi nomor HP berbasis normalisasi
+      if (hpIdx !== -1 && normalizePhone_(data[i][hpIdx]) === inputHpNorm) {
         return { success: false, message: 'Nomor HP sudah terdaftar. Silakan login!' };
       }
     }
